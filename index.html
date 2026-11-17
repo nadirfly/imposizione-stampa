@@ -1,0 +1,2542 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imposizione Stampa</title>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-dim: #aab;
+    --green: #4ecca3;
+    --yellow: #f0c040;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, var(--surface), var(--card));
+    padding: 16px 28px;
+    border-bottom: 3px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  header h1 { font-size: 1.35rem; font-weight: 600; }
+  header p { font-size: 0.8rem; color: var(--text-dim); }
+
+  .container {
+    max-width: 1350px;
+    margin: 0 auto;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 900px) { .container { grid-template-columns: 1fr; } }
+
+  .left-col { display: flex; flex-direction: column; gap: 14px; }
+
+  .panel {
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid rgba(255,255,255,.06);
+  }
+  .panel h2 {
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block; font-size: 0.78rem; color: var(--text-dim);
+    margin-bottom: 3px; font-weight: 500;
+  }
+  .field select, .field input[type="number"] {
+    width: 100%; padding: 8px 10px; border-radius: 7px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: var(--bg); color: var(--text);
+    font-size: 0.88rem; outline: none;
+  }
+  .field select:focus, .field input:focus { border-color: var(--accent); }
+  .field select option { background: var(--bg); }
+
+  .checkbox-field {
+    display: flex; align-items: center; gap: 7px; margin-bottom: 8px;
+  }
+  .checkbox-field input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .checkbox-field label { font-size: 0.8rem; color: var(--text-dim); cursor: pointer; }
+
+  /* Upload */
+  .upload-zone {
+    border: 2px dashed rgba(233,69,96,.4);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    margin-bottom: 10px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent); background: rgba(233,69,96,.06);
+  }
+  .upload-zone input { display: none; }
+  .upload-zone .icon { font-size: 1.8rem; margin-bottom: 4px; }
+  .upload-zone .label { font-size: 0.82rem; color: var(--text-dim); }
+  .upload-zone .filename { margin-top: 5px; font-size: 0.8rem; color: var(--green); font-weight: 600; }
+  .upload-zone .file-info { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+
+  /* Transform controls */
+  .transform-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .transform-grid .field { margin-bottom: 0; }
+
+  .rot-btns {
+    display: flex; gap: 4px; margin-bottom: 10px;
+  }
+  .rot-btn {
+    flex: 1;
+    padding: 7px 4px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all .15s;
+  }
+  .rot-btn:hover { border-color: var(--accent); color: var(--text); }
+  .rot-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Slider */
+  .slider-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .slider-row label { font-size: 0.78rem; color: var(--text-dim); white-space: nowrap; min-width: 50px; }
+  .slider-row input[type="range"] {
+    flex: 1; accent-color: var(--accent);
+    height: 4px; cursor: pointer;
+  }
+  .slider-row .slider-val {
+    font-size: 0.8rem; color: var(--green); font-weight: 600;
+    min-width: 42px; text-align: right;
+  }
+
+  .reset-btn {
+    padding: 5px 12px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Results */
+  .results {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 7px; margin-top: 12px;
+  }
+  .stat {
+    background: var(--card); border-radius: 7px;
+    padding: 9px; text-align: center;
+  }
+  .stat .val { font-size: 1.2rem; font-weight: 700; color: var(--green); }
+  .stat .lbl { font-size: 0.68rem; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; }
+  .stat.warn .val { color: var(--yellow); }
+  .stat.full { grid-column: 1 / -1; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 20px;
+    font-size: 0.7rem; font-weight: 600; margin-top: 5px; margin-right: 3px;
+  }
+  .badge-green { background: rgba(78,204,163,.15); color: var(--green); }
+  .badge-yellow { background: rgba(240,192,64,.15); color: var(--yellow); }
+  .badge-red { background: rgba(233,69,96,.15); color: var(--accent); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border: none; border-radius: 7px;
+    font-size: 0.85rem; cursor: pointer; font-weight: 500;
+    transition: background .2s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #c33a52; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+  /* Preview */
+  .preview-area { display: flex; flex-direction: column; gap: 16px; }
+  .canvas-wrap {
+    background: var(--surface); border-radius: 12px;
+    padding: 16px; border: 1px solid rgba(255,255,255,.06);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .canvas-wrap h2 {
+    font-size: 0.85rem; margin-bottom: 10px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+    align-self: flex-start;
+  }
+  canvas {
+    background: #fff; border-radius: 4px; max-width: 100%;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+  }
+  canvas.pannable { cursor: grab; }
+  canvas.pannable:active, canvas.panning { cursor: grabbing; }
+
+  .pan-hint {
+    font-size: 0.75rem; color: var(--yellow); margin-top: 6px;
+    display: none; align-items: center; gap: 5px;
+  }
+  .pan-hint.visible { display: flex; }
+  .pan-hint svg { flex-shrink: 0; }
+
+  /* Instructions */
+  .instructions {
+    background: var(--surface); border-radius: 12px;
+    padding: 18px; border: 1px solid rgba(255,255,255,.06);
+  }
+  .instructions h2 {
+    font-size: 0.85rem; margin-bottom: 8px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+  }
+  .instructions ol { padding-left: 16px; line-height: 1.6; font-size: 0.85rem; color: var(--text-dim); }
+  .instructions li { margin-bottom: 4px; }
+  .instructions strong { color: var(--text); }
+  .info-box {
+    margin-top: 10px; padding: 9px 11px;
+    border-radius: 0 8px 8px 0; font-size: 0.8rem; line-height: 1.4;
+  }
+  .info-green { background: rgba(78,204,163,.1); border-left: 3px solid var(--green); }
+  .info-red { background: rgba(233,69,96,.1); border-left: 3px solid var(--accent); }
+  .info-yellow { background: rgba(240,192,64,.1); border-left: 3px solid var(--yellow); }
+
+  /* Loading */
+  .loading {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.6);
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+  }
+  .loading.hidden { display: none; }
+  .loading-content {
+    background: var(--surface); padding: 28px 36px;
+    border-radius: 12px; text-align: center;
+  }
+  .spinner {
+    width: 36px; height: 36px; margin: 0 auto 10px;
+    border: 3px solid rgba(255,255,255,.1);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .scale-info {
+    margin-top: 6px; font-size: 0.76rem; color: var(--text-dim);
+    padding: 7px; background: rgba(255,255,255,.03); border-radius: 6px;
+  }
+  .scale-info strong { color: var(--yellow); }
+
+  .auto-rot-indicator {
+    font-size: 0.75rem; color: var(--green);
+    margin-top: 4px; font-style: italic;
+  }
+  .force-zoom-info {
+    margin-top: 6px; font-size: 0.76rem; color: var(--yellow);
+    padding: 6px 8px; background: rgba(240,192,64,.08);
+    border-radius: 6px; line-height: 1.4;
+  }
+  .force-zoom-info.error { color: var(--accent); background: rgba(233,69,96,.08); }
+  .force-zoom-info.ok { color: var(--green); background: rgba(78,204,163,.08); }
+
+  /* Schede modalita' */
+  .mode-tabs { max-width: 1350px; margin: 14px auto 0; padding: 0 18px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .mode-tab {
+    padding: 9px 16px; border-radius: 8px 8px 0 0; border: 1px solid rgba(255,255,255,.1);
+    border-bottom: 3px solid transparent; background: var(--surface); color: var(--text-dim);
+    font-size: .85rem; cursor: pointer; font-weight: 500;
+  }
+  .mode-tab:hover { color: var(--text); }
+  .mode-tab.active { color: var(--text); border-bottom-color: var(--accent); background: var(--card); }
+
+  /* Libro */
+  .bk-nav { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; align-self: stretch; flex-wrap: wrap; }
+  .bk-nav span { font-size: .82rem; color: var(--text); min-width: 210px; text-align: center; }
+  .bk-list { max-height: 120px; overflow: auto; font-size: .72rem; color: var(--text-dim); line-height: 1.5;
+             background: var(--bg); border-radius: 6px; padding: 6px 8px; margin-bottom: 10px; display: none; }
+  .bk-hint { font-size: .72rem; color: var(--text-dim); margin-top: -6px; margin-bottom: 10px; line-height: 1.4; }
+  .msg-box {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 120;
+    max-width: min(560px, calc(100% - 32px)); display: flex; gap: 12px; align-items: center;
+    background: var(--card); color: var(--text); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 12px 14px; font-size: .85rem; line-height: 1.4;
+    box-shadow: 0 8px 30px rgba(0,0,0,.5);
+  }
+  .msg-box.ok { border-color: var(--green); }
+  .msg-box[hidden] { display: none; }
+  .field input[type="text"] { width: 100%; padding: 8px 10px; border-radius: 7px; border: 1px solid rgba(255,255,255,.12);
+             background: var(--bg); color: var(--text); font-size: .88rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+    <rect x="2" y="6" width="36" height="28" rx="3" stroke="#e94560" stroke-width="2" fill="none"/>
+    <line x1="14" y1="6" x2="14" y2="34" stroke="#e94560" stroke-width="1" stroke-dasharray="3 2"/>
+    <line x1="26" y1="6" x2="26" y2="34" stroke="#e94560" stroke-width="1" stroke-dasharray="3 2"/>
+    <line x1="2" y1="20" x2="38" y2="20" stroke="#e94560" stroke-width="1" stroke-dasharray="3 2"/>
+  </svg>
+  <div>
+    <h1>Imposizione Stampa</h1>
+    <p>Carica, scala, ruota, imponi e scarica il PDF pronto per la stampa</p>
+  </div>
+</header>
+
+<nav class="mode-tabs">
+  <button class="mode-tab active" data-mode="modeCopies">Copie su foglio</button>
+  <button class="mode-tab" data-mode="modeBook">Libro &middot; brossura / punto metallico</button>
+</nav>
+
+<div class="container" id="modeCopies">
+  <div class="left-col">
+    <!-- Upload -->
+    <div class="panel">
+      <h2>1. Carica documento</h2>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.tiff,.tif,.bmp">
+        <div class="icon">&#128196;</div>
+        <div class="label">Trascina qui o clicca<br><small>PDF, JPG, PNG, TIFF</small></div>
+        <div class="filename" id="fileName"></div>
+        <div class="file-info" id="fileInfo"></div>
+      </div>
+      <div class="field">
+        <label>Pagina PDF</label>
+        <input type="number" id="pdfPage" value="1" min="1" max="999">
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="panel">
+      <h2>2. Formato e foglio</h2>
+      <div class="field">
+        <label>Formato finale (output)</label>
+        <select id="docFormat">
+          <option value="A6">A6 (105 x 148 mm)</option>
+          <option value="A5">A5 (148 x 210 mm)</option>
+          <option value="A4">A4 (210 x 297 mm)</option>
+          <option value="DL">DL (99 x 210 mm)</option>
+          <option value="100x150">Cartolina (100 x 150 mm)</option>
+          <option value="same">Stesso del file caricato</option>
+          <option value="custom">Personalizzato...</option>
+        </select>
+      </div>
+      <div class="field" id="customDocFields" style="display:none;">
+        <label>Larghezza (mm)</label>
+        <input type="number" id="customDocW" value="100" min="10" max="500">
+        <label style="margin-top:5px">Altezza (mm)</label>
+        <input type="number" id="customDocH" value="150" min="10" max="500">
+      </div>
+      <div id="scaleInfoBox" class="scale-info" style="display:none;"></div>
+
+      <div class="field">
+        <label>Foglio stampante</label>
+        <select id="sheetFormat">
+          <option value="A4">A4 (210 x 297 mm)</option>
+          <option value="A3" selected>A3 (297 x 420 mm)</option>
+          <option value="SRA3">SRA3 (320 x 450 mm)</option>
+          <option value="SRA4">SRA4 (225 x 320 mm)</option>
+          <option value="12x18">12x18" (305 x 457 mm)</option>
+          <option value="13x19">13x19" (330 x 483 mm)</option>
+          <optgroup label="Epson SureLab D700 (rotolo)">
+            <option value="D700-4x6" data-cups="EPKG">4x6" (102 x 152 mm)</option>
+            <option value="D700-5x7" data-cups="EPPhotoPaper2L">5x7" (127 x 178 mm)</option>
+            <option value="D700-8x10" data-cups="EP8x10in">8x10" (203 x 254 mm)</option>
+            <option value="D700-8x12" data-cups="EP8x12LabRoll">8x12" (203 x 305 mm)</option>
+            <option value="D700-A4" data-cups="A4.RollAE">A4 rotolo (210 x 297 mm)</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="transform-grid">
+        <div class="field">
+          <label>Quantita</label>
+          <input type="number" id="qty" value="1" min="1" max="100000">
+        </div>
+        <div class="field">
+          <label>Bleed (mm/lato)</label>
+          <input type="number" id="bleed" value="3" min="0" max="10" step="0.5">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Stampante</label>
+        <select id="printerSelect">
+          <option value="custom" data-margin="5">Personalizzato...</option>
+          <option value="OKI_DATA_CORP_C911" data-margin="4.6" selected>OKI C911 (4.6mm)</option>
+          <option value="OKI_DATA_CORP_C911_2" data-margin="4.6">OKI C911 #2 (4.6mm)</option>
+          <option value="Olivetti_454" data-margin="4.2">Olivetti 454 (4.2mm)</option>
+          <option value="Olivetti_454_sra3" data-margin="6.7">Olivetti 454 - SRA3 (6.7mm)</option>
+          <option value="HP_LaserJet_P2015" data-margin="6.3">HP LaserJet P2015 (6.3mm)</option>
+          <option value="Canon_TM_300" data-margin="3.0">Canon TM-300 (3.0mm)</option>
+          <option value="Canon_TM_300_bl" data-margin="0">Canon TM-300 Borderless (0mm)</option>
+          <option value="EPSON_SC_P600" data-margin="3.0">Epson SC-P600 (3.0mm)</option>
+          <option value="EPSON_SC_P600_bl" data-margin="0">Epson SC-P600 Borderless (0mm)</option>
+          <option value="EPSON_SL_D700" data-margin="0">Epson SureLab D700 (0mm)</option>
+        </select>
+      </div>
+      <div class="field" id="customMarginField">
+        <label>Margine stampante (mm)</label>
+        <input type="number" id="printerMargin" value="4.6" min="0" max="20" step="0.5">
+      </div>
+
+      <div class="checkbox-field">
+        <input type="checkbox" id="showCropMarks" checked>
+        <label for="showCropMarks">Segni di taglio</label>
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="showBleed" checked>
+        <label for="showBleed">Mostra abbondanza</label>
+      </div>
+
+      <div class="field">
+        <label>Copie per foglio</label>
+        <select id="copiesMode">
+          <option value="auto">Automatico (massimo possibile)</option>
+          <option value="force">Forza numero copie...</option>
+        </select>
+      </div>
+      <div class="field" id="forceCopiesField" style="display:none;">
+        <label>Numero copie per foglio</label>
+        <input type="number" id="forceCopies" value="4" min="1" max="64">
+        <div id="forceInfo" class="force-zoom-info"></div>
+      </div>
+    </div>
+
+    <!-- Transform controls -->
+    <div class="panel">
+      <h2>3. Regolazioni contenuto</h2>
+
+      <div class="checkbox-field">
+        <input type="checkbox" id="autoRotate" checked>
+        <label for="autoRotate">Auto-rotazione (riempie meglio l'area)</label>
+      </div>
+      <div id="autoRotInfo" class="auto-rot-indicator"></div>
+
+      <label style="font-size:.78rem;color:var(--text-dim);margin-bottom:4px;display:block;">Rotazione manuale</label>
+      <div class="rot-btns" id="rotBtns">
+        <button class="rot-btn active" data-rot="0">0&deg;</button>
+        <button class="rot-btn" data-rot="90">90&deg;</button>
+        <button class="rot-btn" data-rot="180">180&deg;</button>
+        <button class="rot-btn" data-rot="270">270&deg;</button>
+      </div>
+
+      <div class="slider-row">
+        <label>Zoom</label>
+        <input type="range" id="zoomSlider" min="25" max="250" value="100" step="1">
+        <span class="slider-val" id="zoomVal">100%</span>
+      </div>
+
+      <div class="transform-grid">
+        <div class="field">
+          <label>Offset X (mm)</label>
+          <input type="number" id="offsetX" value="0" step="0.5">
+        </div>
+        <div class="field">
+          <label>Offset Y (mm)</label>
+          <input type="number" id="offsetY" value="0" step="0.5">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Modalita riempimento</label>
+        <select id="fillMode">
+          <option value="fit" selected>Adatta (fit) - tutto visibile</option>
+          <option value="fill">Riempi (fill) - copre tutta l'area</option>
+          <option value="stretch">Deforma (stretch) - riempie esatto</option>
+        </select>
+      </div>
+
+      <button class="reset-btn" id="btnReset">Reset regolazioni</button>
+    </div>
+
+    <!-- Results -->
+    <div class="panel">
+      <h2>Riepilogo</h2>
+      <div id="badges"></div>
+      <div class="results" id="results"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btnGenerate" disabled>Genera PDF imposto</button>
+        <button class="btn btn-primary" id="btnPrint" disabled hidden>Stampa su stampante</button>
+        <button class="btn btn-primary" id="btnBatch" hidden>Stampa cartella di foto...</button>
+      </div>
+      <div id="batchBox" hidden style="margin-top:10px;font-size:13px;line-height:1.5;">
+        <div id="batchText"></div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="batchGo">Avvia stampa</button>
+          <button class="reset-btn" id="batchStop" hidden>Ferma</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right -->
+  <div class="preview-area">
+    <div class="canvas-wrap">
+      <h2>Anteprima imposizione</h2>
+      <canvas id="preview" width="600" height="500"></canvas>
+      <div class="pan-hint" id="panHint">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v11M10 10.5V8a2 2 0 0 0-4 0v8.4c0 .83.1 1.65.3 2.45L7.5 23h9l2.24-6.72A10 10 0 0 0 19 13V9a2 2 0 0 0-4 0v2"/></svg>
+        Trascina per spostare il contenuto nella cella
+      </div>
+    </div>
+    <div class="instructions" id="cutInstructions"></div>
+  </div>
+</div>
+
+<div class="container" id="modeBook" style="display:none;">
+  <div class="left-col">
+    <div class="panel">
+      <h2>1. Carica le pagine</h2>
+      <div class="upload-zone" id="bkUpload">
+        <input type="file" id="bkFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.webp">
+        <div class="icon">&#128218;</div>
+        <div class="label">Trascina qui o clicca<br><small>piu' JPG/PNG (in ordine di nome) o PDF</small></div>
+        <div class="filename" id="bkFileName"></div>
+        <div class="file-info" id="bkFileInfo"></div>
+      </div>
+      <div class="bk-list" id="bkList"></div>
+      <div class="field">
+        <label>Contenuto</label>
+        <select id="bkContent">
+          <option value="spreads">Doppie pagine (ogni immagine = pagina sinistra + destra)</option>
+          <option value="single">Pagine singole</option>
+        </select>
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="bkBlankEnds" checked>
+        <label for="bkBlankEnds">Pagina 1 e ultima bianche (da incollare alla copertina)</label>
+      </div>
+      <div class="bk-hint" id="bkContentHint"></div>
+    </div>
+
+    <div class="panel">
+      <h2>2. Libro e foglio</h2>
+      <div class="field">
+        <label>Legatura</label>
+        <select id="bkBinding">
+          <option value="perfect">Brossura &mdash; fogli piegati uno a uno e impilati</option>
+          <option value="saddle">Punto metallico &mdash; fogli uno dentro l'altro</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Foglio di stampa (orizzontale)</label>
+        <select id="bkSheet">
+          <option value="A4">A4 (297 x 210 mm)</option>
+          <option value="A3">A3 (420 x 297 mm)</option>
+          <option value="SRA3" selected>SRA3 (450 x 320 mm)</option>
+          <option value="12x18">12x18" (457 x 305 mm)</option>
+          <option value="13x19">13x19" (483 x 330 mm)</option>
+        </select>
+      </div>
+      <div class="transform-grid">
+        <div class="field"><label>Pagina: larghezza (mm)</label><input type="number" id="bkPageW" value="200" min="30" max="500" step="0.5"></div>
+        <div class="field"><label>Pagina: altezza (mm)</label><input type="number" id="bkPageH" value="200" min="30" max="500" step="0.5"></div>
+      </div>
+      <div class="btn-row" style="margin-top:-4px;margin-bottom:12px;">
+        <button class="reset-btn" id="bkMax">Pagina piu' grande possibile</button>
+      </div>
+      <div class="transform-grid">
+        <div class="field"><label>Abbondanza (mm)</label><input type="number" id="bkBleed" value="3" min="0" max="10" step="0.5"></div>
+        <div class="field"><label>Prolunga sul dorso (mm)</label><input type="number" id="bkGutter" value="5" min="0" max="30" step="0.5"></div>
+      </div>
+      <div class="bk-hint">Prolunga: la foto continua oltre il centro per questi mm, nella parte che finisce nel dorso.
+        Cosi' dopo la rilegatura le foto a cavallo delle due pagine non perdono il centro. 0 = nessuna.</div>
+      <div class="field"><label>Margine stampante (mm)</label><input type="number" id="bkMargin" value="4.6" min="0" max="20" step="0.1"></div>
+      <div class="field">
+        <label>Riempimento</label>
+        <select id="bkFill">
+          <option value="fill">Riempi (copre pagina e abbondanza, taglia l'eccesso)</option>
+          <option value="fit">Adatta (tutto visibile, eventuali bordi bianchi)</option>
+        </select>
+      </div>
+      <div class="checkbox-field">
+        <input type="checkbox" id="bkMarks" checked>
+        <label for="bkMarks">Segni di taglio, piega e prolunga</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Riepilogo</h2>
+      <div id="bkBadges"></div>
+      <div class="results" id="bkResults"></div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="bkGenerate" disabled>Genera PDF libro</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview-area">
+    <div class="canvas-wrap">
+      <h2>Anteprima</h2>
+      <div class="bk-nav">
+        <button class="reset-btn" id="bkPrev">&#9664;</button>
+        <span id="bkSideLbl">-</span>
+        <button class="reset-btn" id="bkNext">&#9654;</button>
+        <div class="checkbox-field" style="margin:0 0 0 auto;">
+          <input type="checkbox" id="bkSim">
+          <label for="bkSim">Libro aperto (rilegato, simulato)</label>
+        </div>
+      </div>
+      <canvas id="bkPreview" width="640" height="460"></canvas>
+    </div>
+    <div class="instructions" id="bkInstructions"></div>
+  </div>
+</div>
+
+<div class="msg-box" id="msgBox" role="alert" hidden>
+  <span id="msgText"></span>
+  <button class="reset-btn" id="msgClose" type="button">Chiudi</button>
+</div>
+
+<div class="loading hidden" id="loading">
+  <div class="loading-content">
+    <div class="spinner"></div>
+    <div id="loadingText">Generazione PDF...</div>
+  </div>
+</div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// Messaggi nella pagina (al posto di alert(), che in una WebView non compare)
+function showMessage(text, ok) {
+  const box = document.getElementById('msgBox');
+  document.getElementById('msgText').textContent = text;
+  box.classList.toggle('ok', !!ok);
+  box.hidden = false;
+  clearTimeout(showMessage.t);
+  showMessage.t = setTimeout(() => { box.hidden = true; }, ok ? 6000 : 15000);
+}
+document.getElementById('msgClose').addEventListener('click', () => { document.getElementById('msgBox').hidden = true; });
+
+// Salva il PDF: nell'app con il pannello di macOS, nel browser con un normale download.
+// App macOS (guscio nativo): window.nativeBridge e' definito da app/. Salvataggio e stampa
+// (CUPS) passano da li'; nel browser e nella versione web resta tutto com'era.
+const NATIVE = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.native);
+function bytesToBase64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+// Chiamate al guscio: ogni richiesta ha un id e una Promise che si chiude con la risposta.
+const nativePending = {};
+let nativeSeq = 0, batchRunning = false;
+function nativeCall(msg) {
+  return new Promise(resolve => {
+    const id = ++nativeSeq;
+    nativePending[id] = resolve;
+    window.webkit.messageHandlers.native.postMessage(Object.assign({ id }, msg));
+  });
+}
+window.nativeResult = function (r) {   // risposta del guscio a save/print
+  hideLoading();
+  const done = nativePending[r && r.id];
+  if (done) { delete nativePending[r.id]; done(r); }
+  if (r && r.message && !batchRunning) showMessage(r.message, !!r.ok);
+};
+window.nativeBatchFile = function (r) {
+  const done = nativePending[r && r.id];
+  if (done) { delete nativePending[r.id]; done(r); }
+};
+let printAfterGenerate = false, lastPrintOk = false, lastPrintMsg = '';
+
+async function savePdf(bytes, filename) {
+  hideLoading();
+  if (NATIVE) {
+    if (printAfterGenerate) {
+      printAfterGenerate = false;
+      const sel = document.getElementById('printerSelect');
+      const sheetOpt = document.getElementById('sheetFormat');
+      const [sw, sh] = getSheetSize();
+      if (!batchRunning) showLoading('Invio alla stampante...');
+      const r = await nativeCall({
+        action: 'print', printer: sel.value, filename, pdf: bytesToBase64(bytes),
+        cupsSize: sheetOpt.options[sheetOpt.selectedIndex].dataset.cups || '',
+        widthPt: sw * MM_TO_PT, heightPt: sh * MM_TO_PT,
+      });
+      lastPrintOk = !!r.ok; lastPrintMsg = r.message || '';
+    } else {
+      await nativeCall({ action: 'save', filename, pdf: bytesToBase64(bytes) });
+    }
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+
+const MM_TO_PT = 72 / 25.4;
+const PT_TO_MM = 25.4 / 72;
+
+const FORMATS = {
+  'A6': [105, 148], 'A5': [148, 210], 'A4': [210, 297],
+  'DL': [99, 210], '100x150': [100, 150],
+  'A3': [297, 420], 'SRA3': [320, 450], 'SRA4': [225, 320],
+  '12x18': [305, 457], '13x19': [330, 483],
+  // Epson SureLab D700: misure dal PPD del pilota (punti -> mm)
+  'D700-4x6': [101.6, 152.4], 'D700-5x7': [127, 177.9], 'D700-8x10': [203.2, 254],
+  'D700-8x12': [203.2, 304.8], 'D700-A4': [210, 297],
+};
+
+// State
+let uploadedFile = null;
+let pdfDoc = null;
+let pageImage = null;
+let sourcePageW = 0;
+let sourcePageH = 0;
+
+// Transform state
+let contentRotation = 0;   // 0, 90, 180, 270
+let contentZoom = 100;      // percentage
+let contentOffsetX = 0;     // mm
+let contentOffsetY = 0;     // mm
+let autoRotApplied = 0;     // auto-rotation that was applied
+let previewScale = 1;       // px per mm in preview canvas
+let contentOverflows = false; // whether content exceeds cell
+
+// Upload
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+
+async function handleFile(file) {
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileInfo').textContent = `${(file.size / 1024).toFixed(0)} KB`;
+  resetTransforms();
+
+  const arrayBuffer = await file.arrayBuffer();
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    await loadPDF(arrayBuffer);
+  } else {
+    await loadImage(arrayBuffer, file.type);
+  }
+}
+
+async function loadPDF(buffer) {
+  showLoading('Caricamento PDF...');
+  try {
+    const bufCopy1 = buffer.slice(0);
+    const bufCopy2 = buffer.slice(0);
+
+    pdfDoc = await pdfjsLib.getDocument({ data: bufCopy1 }).promise;
+    const pageNum = Math.min(parseInt(document.getElementById('pdfPage').value) || 1, pdfDoc.numPages);
+    document.getElementById('pdfPage').max = pdfDoc.numPages;
+    document.getElementById('fileInfo').textContent += ` - ${pdfDoc.numPages} pag.`;
+
+    const page = await pdfDoc.getPage(pageNum);
+    const vp = page.getViewport({ scale: 1 });
+    sourcePageW = vp.width * PT_TO_MM;
+    sourcePageH = vp.height * PT_TO_MM;
+
+    const scale = 2;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    pageImage = new Image();
+    pageImage.src = canvas.toDataURL();
+    await new Promise(r => pageImage.onload = r);
+
+    uploadedFile = { type: 'pdf', data: bufCopy2 };
+    document.getElementById('btnGenerate').disabled = false; document.getElementById('btnPrint').disabled = false;
+    applyAutoRotation();
+    calculate();
+  } catch (e) {
+    showMessage('Errore nel caricamento del PDF: ' + e.message);
+  }
+  hideLoading();
+}
+
+async function loadImage(buffer, mimeType) {
+  showLoading('Caricamento immagine...');
+  try {
+    const blob = new Blob([buffer], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.src = url;
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+
+    sourcePageW = img.naturalWidth / 300 * 25.4;
+    sourcePageH = img.naturalHeight / 300 * 25.4;
+
+    pageImage = img;
+    uploadedFile = { type: 'image', data: buffer, mimeType };
+    pdfDoc = null;
+    document.getElementById('btnGenerate').disabled = false; document.getElementById('btnPrint').disabled = false;
+    applyAutoRotation();
+    calculate();
+  } catch (e) {
+    showMessage('Questo browser non riesce a leggere l\'immagine (' + (mimeType || 'formato sconosciuto') + '). '
+          + 'Chrome e Firefox non leggono i TIFF: convertila in JPG o PNG, oppure usa Safari.');
+  }
+  hideLoading();
+}
+
+document.getElementById('pdfPage').addEventListener('change', async () => {
+  if (!pdfDoc) return;
+  const pageNum = Math.min(Math.max(1, parseInt(document.getElementById('pdfPage').value) || 1), pdfDoc.numPages);
+  const page = await pdfDoc.getPage(pageNum);
+  const vp = page.getViewport({ scale: 1 });
+  sourcePageW = vp.width * PT_TO_MM;
+  sourcePageH = vp.height * PT_TO_MM;
+
+  const scale = 2;
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  pageImage = new Image();
+  pageImage.src = canvas.toDataURL();
+  await new Promise(r => pageImage.onload = r);
+  applyAutoRotation();
+  calculate();
+});
+
+// Auto-rotation: rotates the content 90deg if it better fills the target cell
+function applyAutoRotation() {
+  if (!document.getElementById('autoRotate').checked || !uploadedFile) {
+    autoRotApplied = 0;
+    document.getElementById('autoRotInfo').textContent = '';
+    return;
+  }
+
+  const [docW, docH] = getDocSize();
+  const bleed = parseFloat(document.getElementById('bleed').value) || 0;
+  const cellW = docW + bleed * 2;
+  const cellH = docH + bleed * 2;
+
+  // Source dimensions considering manual rotation
+  const manualRot = contentRotation;
+  let srcW = sourcePageW, srcH = sourcePageH;
+
+  // Try 0deg: how well does source fill the cell?
+  const fit0 = Math.min(cellW / srcW, cellH / srcH);
+  const area0 = (srcW * fit0) * (srcH * fit0);
+
+  // Try 90deg: swap source dims
+  const fit90 = Math.min(cellW / srcH, cellH / srcW);
+  const area90 = (srcH * fit90) * (srcW * fit90);
+
+  const infoEl = document.getElementById('autoRotInfo');
+
+  if (area90 > area0 * 1.02) { // 2% threshold to avoid unnecessary rotation
+    autoRotApplied = 90;
+    infoEl.textContent = 'Auto-ruotato 90° per riempire meglio l\'area';
+  } else {
+    autoRotApplied = 0;
+    infoEl.textContent = 'Orientamento originale ottimale';
+  }
+}
+
+// Get effective total rotation (auto + manual)
+function getTotalRotation() {
+  return (autoRotApplied + contentRotation) % 360;
+}
+
+// Get source dimensions after rotation
+function getRotatedSourceSize() {
+  const rot = getTotalRotation();
+  if (rot === 90 || rot === 270) {
+    return [sourcePageH, sourcePageW];
+  }
+  return [sourcePageW, sourcePageH];
+}
+
+// Transform controls
+document.querySelectorAll('.rot-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    contentRotation = parseInt(btn.dataset.rot);
+    document.querySelectorAll('.rot-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyAutoRotation();
+    calculate();
+  });
+});
+
+document.getElementById('zoomSlider').addEventListener('input', function () {
+  contentZoom = parseInt(this.value);
+  document.getElementById('zoomVal').textContent = contentZoom + '%';
+  calculate();
+});
+
+document.getElementById('offsetX').addEventListener('input', function () {
+  contentOffsetX = parseFloat(this.value) || 0;
+  calculate();
+});
+
+document.getElementById('offsetY').addEventListener('input', function () {
+  contentOffsetY = parseFloat(this.value) || 0;
+  calculate();
+});
+
+document.getElementById('autoRotate').addEventListener('change', () => {
+  applyAutoRotation();
+  calculate();
+});
+
+document.getElementById('fillMode').addEventListener('change', calculate);
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  resetTransforms();
+  applyAutoRotation();
+  calculate();
+});
+
+function resetTransforms() {
+  contentRotation = 0;
+  contentZoom = 100;
+  contentOffsetX = 0;
+  contentOffsetY = 0;
+  autoRotApplied = 0;
+  document.getElementById('zoomSlider').value = 100;
+  document.getElementById('zoomVal').textContent = '100%';
+  document.getElementById('offsetX').value = 0;
+  document.getElementById('offsetY').value = 0;
+  document.getElementById('fillMode').value = 'fit';
+  document.querySelectorAll('.rot-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.rot === '0');
+  });
+}
+
+function getDocSize() {
+  const fmt = document.getElementById('docFormat').value;
+  if (fmt === 'same') return [Math.round(sourcePageW) || 210, Math.round(sourcePageH) || 297];
+  if (fmt === 'custom') return [
+    parseFloat(document.getElementById('customDocW').value) || 100,
+    parseFloat(document.getElementById('customDocH').value) || 150
+  ];
+  return FORMATS[fmt];
+}
+
+function getSheetSize() {
+  return FORMATS[document.getElementById('sheetFormat').value];
+}
+
+// UNICA funzione di posizionamento, usata da anteprima e PDF (prima erano due calcoli diversi).
+// trimW/trimH = formato finito della cella sul foglio (gia' ruotato se la cella e' ruotata),
+// srcW/srcH = contenuto NON ruotato (unita' qualsiasi), rotCW = rotazione oraria totale.
+// Ritorna le dimensioni (mm) del contenuto non ruotato: si disegna centrato, poi si ruota.
+//  fit = tutto visibile dentro il formato finito; fill = copre anche l'abbondanza; stretch = deforma.
+function contentPlacement(trimW, trimH, bleed, srcW, srcH, rotCW) {
+  const fillMode = document.getElementById('fillMode').value;
+  const swap = ((rotCW % 180) + 180) % 180 !== 0;
+  const tW = swap ? trimH : trimW, tH = swap ? trimW : trimH;
+  const bW = tW + 2 * bleed, bH = tH + 2 * bleed;
+  if (fillMode === 'stretch') return { w: bW, h: bH };
+  const sc = fillMode === 'fill' ? Math.max(bW / srcW, bH / srcH) : Math.min(tW / srcW, tH / srcH);
+  return { w: srcW * sc, h: srcH * sc };
+}
+
+// Rotazione oraria del contenuto in una cella: auto + manuale + 90 se la cella e' ruotata sul foglio
+function cellRotation(docRotated) {
+  return (getTotalRotation() + (docRotated ? 90 : 0)) % 360;
+}
+
+// Disegna un'immagine o una pagina incorporata (pdf-lib) centrata in (cx, cy) pt, dimensioni
+// NON ruotate w x h pt, ruotata di rotCW gradi in senso orario attorno al proprio centro.
+function pdfDrawCentered(page, obj, isImage, cx, cy, w, h, rotCW) {
+  const th = -rotCW * Math.PI / 180;               // pdf-lib: angoli positivi = antiorario
+  const vx = (w / 2) * Math.cos(th) - (h / 2) * Math.sin(th);
+  const vy = (w / 2) * Math.sin(th) + (h / 2) * Math.cos(th);
+  const opt = { x: cx - vx, y: cy - vy, rotate: PDFLib.degrees(-rotCW) };
+  if (isImage) page.drawImage(obj, Object.assign(opt, { width: w, height: h }));
+  else page.drawPage(obj, Object.assign(opt, { xScale: w / obj.width, yScale: h / obj.height }));
+}
+
+function pdfClip(page, x, y, w, h) {
+  page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.rectangle(x, y, w, h), PDFLib.clip(), PDFLib.endPath());
+}
+function pdfUnclip(page) { page.pushOperators(PDFLib.popGraphicsState()); }
+
+// Calculate content placement within a cell (vecchia funzione, non piu' usata per disegnare)
+function calcContentPlacement(cellWmm, cellHmm) {
+  const [rSrcW, rSrcH] = getRotatedSourceSize();
+  const zoom = contentZoom / 100;
+  const fillMode = document.getElementById('fillMode').value;
+
+  let baseScale;
+  if (fillMode === 'fit') {
+    baseScale = Math.min(cellWmm / rSrcW, cellHmm / rSrcH);
+  } else if (fillMode === 'fill') {
+    baseScale = Math.max(cellWmm / rSrcW, cellHmm / rSrcH);
+  } else { // stretch - handled differently
+    return {
+      scale: zoom,
+      stretchX: (cellWmm / rSrcW) * zoom,
+      stretchY: (cellHmm / rSrcH) * zoom,
+      stretch: true,
+      offsetX: contentOffsetX,
+      offsetY: contentOffsetY,
+      rotation: getTotalRotation()
+    };
+  }
+
+  const finalScale = baseScale * zoom;
+  return {
+    scale: finalScale,
+    stretchX: finalScale,
+    stretchY: finalScale,
+    stretch: false,
+    offsetX: contentOffsetX,
+    offsetY: contentOffsetY,
+    rotation: getTotalRotation()
+  };
+}
+
+// Find best layout for given cell dimensions on a sheet
+function findBestLayout(docBW, docBH, sheetW, sheetH, margin, cropSpace) {
+  let best = null;
+  for (const sr of [false, true]) {
+    const sW = sr ? sheetH : sheetW;
+    const sH = sr ? sheetW : sheetH;
+    const pW = sW - margin * 2;
+    const pH = sH - margin * 2;
+    for (const dr of [false, true]) {
+      const dW = dr ? docBH : docBW;
+      const dH = dr ? docBW : docBH;
+      const cols = Math.floor((pW + cropSpace) / (dW + cropSpace));
+      const rows = Math.floor((pH + cropSpace) / (dH + cropSpace));
+      const n = cols * rows;
+      if (n > 0 && (!best || n > best.count))
+        best = { count: n, cols, rows, cellW: dW, cellH: dH, docRotated: dr,
+                 sheetRotated: sr, sheetW: sW, sheetH: sH, printW: pW, printH: pH, margin };
+    }
+  }
+  return best;
+}
+
+// Find the zoom needed to fit N copies on the sheet
+function findZoomForCopies(targetN, docW, docH, bleed, sheetW, sheetH, margin, cropSpace) {
+  // Binary search for the largest zoom where copies >= targetN
+  let lo = 5, hi = 250, bestZoom = null;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    const z = mid / 100;
+    const bw = docW * z + bleed * 2;
+    const bh = docH * z + bleed * 2;
+    const layout = findBestLayout(bw, bh, sheetW, sheetH, margin, cropSpace);
+    if (layout && layout.count >= targetN) {
+      bestZoom = mid;
+      lo = mid + 0.1;
+    } else {
+      hi = mid - 0.1;
+    }
+  }
+  // Now find the exact largest zoom at which we get exactly targetN
+  // (we want the biggest zoom that still fits targetN copies)
+  if (bestZoom !== null) {
+    // Refine: find max zoom where count >= targetN
+    lo = 5; hi = bestZoom;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      const z = mid / 100;
+      const bw = docW * z + bleed * 2;
+      const bh = docH * z + bleed * 2;
+      const layout = findBestLayout(bw, bh, sheetW, sheetH, margin, cropSpace);
+      if (layout && layout.count >= targetN) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    return Math.floor(lo * 10) / 10; // round down to 0.1%
+  }
+  return null;
+}
+
+function calculate() {
+  const [docW, docH] = getDocSize();
+  const [sheetW, sheetH] = getSheetSize();
+  const bleed = parseFloat(document.getElementById('bleed').value) || 0;
+  const margin = parseFloat(document.getElementById('printerMargin').value) || 0;
+  const qty = parseInt(document.getElementById('qty').value) || 1;
+  const showCropMarks = document.getElementById('showCropMarks').checked;
+  const showBleedArea = document.getElementById('showBleed').checked;
+  const copiesMode = document.getElementById('copiesMode').value;
+  const cropSpace = showCropMarks ? 5 : 0;
+
+  let effectiveZoom = contentZoom; // the zoom used for cell sizing
+  const forceInfoEl = document.getElementById('forceInfo');
+
+  if (copiesMode === 'force') {
+    const targetN = parseInt(document.getElementById('forceCopies').value) || 1;
+    // First check: can we fit targetN at 100%?
+    const bw100 = docW + bleed * 2;
+    const bh100 = docH + bleed * 2;
+    const layout100 = findBestLayout(bw100, bh100, sheetW, sheetH, margin, cropSpace);
+    const count100 = layout100 ? layout100.count : 0;
+
+    if (count100 >= targetN) {
+      // Already fits at 100%, keep zoom as-is (user can zoom freely)
+      effectiveZoom = contentZoom;
+      forceInfoEl.className = 'force-zoom-info ok';
+      forceInfoEl.innerHTML = `Al 100% entrano gia <strong>${count100}</strong> copie. Zoom libero.`;
+    } else {
+      // Need to zoom out to fit targetN
+      const neededZoom = findZoomForCopies(targetN, docW, docH, bleed, sheetW, sheetH, margin, cropSpace);
+      if (neededZoom !== null) {
+        effectiveZoom = Math.floor(neededZoom);
+        contentZoom = effectiveZoom;
+        document.getElementById('zoomSlider').value = effectiveZoom;
+        document.getElementById('zoomVal').textContent = effectiveZoom + '%';
+        forceInfoEl.className = 'force-zoom-info';
+        forceInfoEl.innerHTML = `Zoom auto: <strong>${effectiveZoom}%</strong> per ${targetN} copie sul foglio`;
+      } else {
+        forceInfoEl.className = 'force-zoom-info error';
+        forceInfoEl.innerHTML = `Impossibile: ${targetN} copie non entrano nemmeno al 5%`;
+      }
+    }
+  } else {
+    if (forceInfoEl) forceInfoEl.innerHTML = '';
+  }
+
+  // Use zoomed document dimensions for cell/grid calculation
+  const zoomFactor = effectiveZoom / 100;
+  const scaledDocW = docW * zoomFactor;
+  const scaledDocH = docH * zoomFactor;
+
+  // Scale info
+  const scaleBox = document.getElementById('scaleInfoBox');
+  if (uploadedFile && document.getElementById('docFormat').value !== 'same') {
+    const [rW, rH] = getRotatedSourceSize();
+    const pct = Math.round(Math.min(scaledDocW / rW, scaledDocH / rH) * 100);
+    const action = pct > 100 ? 'Ingrandimento' : pct < 100 ? 'Riduzione' : 'Scala 1:1';
+    scaleBox.style.display = 'block';
+    scaleBox.innerHTML = `Originale: <strong>${sourcePageW.toFixed(0)}x${sourcePageH.toFixed(0)}mm</strong>${getTotalRotation() ? ` (ruotato ${getTotalRotation()}&deg;)` : ''} &rarr; Cella: <strong>${scaledDocW.toFixed(1)}x${scaledDocH.toFixed(1)}mm</strong><br>${action}: <strong>${pct}%</strong>`;
+  } else {
+    scaleBox.style.display = 'none';
+  }
+
+  const docBW = scaledDocW + bleed * 2;
+  const docBH = scaledDocH + bleed * 2;
+
+  let best = findBestLayout(docBW, docBH, sheetW, sheetH, margin, cropSpace);
+
+  if (!best) {
+    document.getElementById('results').innerHTML =
+      '<div class="stat full"><div class="val" style="color:var(--accent)">Troppo grande per il foglio</div></div>';
+    document.getElementById('cutInstructions').innerHTML = '';
+    return;
+  }
+
+  // Store effective dimensions for preview/PDF (the actual cell contains scaled doc)
+  best.effectiveDocW = scaledDocW;
+  best.effectiveDocH = scaledDocH;
+  best.originalDocW = docW;
+  best.originalDocH = docH;
+  best.effectiveZoom = effectiveZoom;
+
+  const sheets = Math.ceil(qty / best.count);
+  const extra = sheets * best.count - qty;
+
+  document.getElementById('results').innerHTML = `
+    <div class="stat"><div class="val">${best.count}</div><div class="lbl">per foglio</div></div>
+    <div class="stat"><div class="val">${best.cols}x${best.rows}</div><div class="lbl">griglia</div></div>
+    <div class="stat"><div class="val">${sheets}</div><div class="lbl">fogli</div></div>
+    <div class="stat ${extra ? 'warn' : ''}"><div class="val">${extra}</div><div class="lbl">extra</div></div>
+    <div class="stat full"><div class="val" style="font-size:.85rem">${scaledDocW.toFixed(1)}x${scaledDocH.toFixed(1)}mm (${effectiveZoom}%) + ${bleed}mm bleed</div><div class="lbl">cella effettiva</div></div>
+  `;
+
+  let badges = '';
+  const sfmt = document.getElementById('sheetFormat').value;
+  badges += best.sheetRotated
+    ? `<span class="badge badge-yellow">${sfmt} oriz.</span>`
+    : `<span class="badge badge-green">${sfmt} vert.</span>`;
+  if (best.docRotated) badges += `<span class="badge badge-yellow">Cella ruotata</span>`;
+  if (getTotalRotation()) badges += `<span class="badge badge-red">Contenuto ${getTotalRotation()}&deg;</span>`;
+  if (effectiveZoom !== 100) badges += `<span class="badge badge-yellow">Zoom ${effectiveZoom}%</span>`;
+  if (copiesMode === 'force') badges += `<span class="badge badge-green">Forzato ${best.count}/foglio</span>`;
+  document.getElementById('badges').innerHTML = badges;
+
+  drawPreview(best, bleed, scaledDocW, scaledDocH, showCropMarks, showBleedArea);
+  generateCutInstructions(best, bleed, scaledDocW, scaledDocH, qty, sheets);
+}
+
+function drawPreview(L, bleed, docW, docH, showCropMarks, showBleedArea) {
+  const canvas = document.getElementById('preview');
+  const ctx = canvas.getContext('2d');
+  const { sheetW, sheetH, margin, cols, rows, cellW, cellH, docRotated } = L;
+  const cropSpace = showCropMarks ? 5 : 0;
+
+  const pad = 12;
+  const maxW = 640, maxH = 540;
+  const scale = Math.min((maxW - pad * 2) / sheetW, (maxH - pad * 2) / sheetH);
+  previewScale = scale; // store globally for drag
+  canvas.width = (sheetW + pad * 2) * scale;
+  canvas.height = (sheetH + pad * 2) * scale;
+  const ox = pad * scale, oy = pad * scale;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Sheet
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(ox, oy, sheetW * scale, sheetH * scale);
+  ctx.strokeStyle = '#999'; ctx.lineWidth = 1;
+  ctx.strokeRect(ox, oy, sheetW * scale, sheetH * scale);
+  // Printable
+  ctx.strokeStyle = '#ccc'; ctx.setLineDash([4, 4]);
+  ctx.strokeRect(ox + margin * scale, oy + margin * scale,
+    (sheetW - margin * 2) * scale, (sheetH - margin * 2) * scale);
+  ctx.setLineDash([]);
+
+  const usedW = cols * cellW + (cols - 1) * cropSpace;
+  const usedH = rows * cellH + (rows - 1) * cropSpace;
+  const startX = margin + (L.printW - usedW) / 2;
+  const startY = margin + (L.printH - usedH) / 2;
+
+  const trimW = docRotated ? docH : docW;
+  const trimH = docRotated ? docW : docH;
+
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cx = startX + c * (cellW + cropSpace);
+      const cy = startY + r * (cellH + cropSpace);
+
+      // Bleed area
+      if (showBleedArea && bleed > 0) {
+        ctx.fillStyle = 'rgba(233,69,96,.08)';
+        ctx.fillRect(ox + cx * scale, oy + cy * scale, cellW * scale, cellH * scale);
+      }
+
+      const tx = cx + bleed;
+      const ty = cy + bleed;
+
+      // Draw content with transforms
+      if (pageImage) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(ox + cx * scale, oy + cy * scale, cellW * scale, cellH * scale);
+        ctx.clip();
+
+        const rotCW = cellRotation(docRotated);
+        const imgW = pageImage.naturalWidth;
+        const imgH = pageImage.naturalHeight;
+        const pl = contentPlacement(trimW, trimH, bleed, imgW, imgH, rotCW);
+        // spostamento nel sistema del foglio (come nel PDF), poi rotazione attorno al centro
+        ctx.translate(ox + (cx + cellW / 2 + contentOffsetX) * scale, oy + (cy + cellH / 2 + contentOffsetY) * scale);
+        ctx.rotate(rotCW * Math.PI / 180);
+        ctx.drawImage(pageImage, -pl.w * scale / 2, -pl.h * scale / 2, pl.w * scale, pl.h * scale);
+        ctx.restore();
+      }
+
+      // Trim border
+      ctx.strokeStyle = '#4ecca3'; ctx.lineWidth = 1.2;
+      ctx.strokeRect(ox + tx * scale, oy + ty * scale, trimW * scale, trimH * scale);
+
+      // Number
+      ctx.fillStyle = pageImage ? 'rgba(80,80,80,.4)' : '#666';
+      ctx.font = `${Math.max(9, 11 * scale)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${r * cols + c + 1}`, ox + (tx + trimW / 2) * scale, oy + (ty + trimH / 2) * scale);
+
+      if (showCropMarks) drawCropMarks(ctx, ox, oy, tx, ty, trimW, trimH, scale);
+    }
+  }
+
+  // Dim labels
+  ctx.fillStyle = '#666';
+  ctx.font = `${Math.max(8, 10 * scale)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText(`${sheetW} mm`, ox + sheetW * scale / 2, oy - 4 * scale);
+  ctx.save();
+  ctx.translate(ox - 4 * scale, oy + sheetH * scale / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(`${sheetH} mm`, 0, 0);
+  ctx.restore();
+
+  // Detect if content overflows cell (enable pan)
+  if (pageImage) {
+    const fillMode = document.getElementById('fillMode').value;
+    const rotCW = cellRotation(docRotated);
+    const pl = contentPlacement(trimW, trimH, bleed, pageImage.naturalWidth, pageImage.naturalHeight, rotCW);
+    const swap = rotCW % 180 !== 0;
+    const renderedW = swap ? pl.h : pl.w, renderedH = swap ? pl.w : pl.h;
+    contentOverflows = (renderedW > cellW * 1.01 || renderedH > cellH * 1.01) || fillMode === 'fill';
+  } else {
+    contentOverflows = false;
+  }
+
+  const previewCanvas = document.getElementById('preview');
+  const panHint = document.getElementById('panHint');
+  if (contentOverflows && pageImage) {
+    previewCanvas.classList.add('pannable');
+    panHint.classList.add('visible');
+  } else {
+    previewCanvas.classList.remove('pannable');
+    panHint.classList.remove('visible');
+  }
+}
+
+function drawCropMarks(ctx, ox, oy, tx, ty, tw, th, scale) {
+  ctx.strokeStyle = '#333'; ctx.lineWidth = 0.5;
+  const len = 4 * scale, gap = 1.5 * scale;
+  [[tx, ty, -1, -1], [tx + tw, ty, 1, -1], [tx, ty + th, -1, 1], [tx + tw, ty + th, 1, 1]]
+    .forEach(([cx, cy, hd, vd]) => {
+      const sx = ox + cx * scale, sy = oy + cy * scale;
+      ctx.beginPath(); ctx.moveTo(sx + hd * gap, sy); ctx.lineTo(sx + hd * (gap + len), sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, sy + vd * gap); ctx.lineTo(sx, sy + vd * (gap + len)); ctx.stroke();
+    });
+}
+
+function generateCutInstructions(L, bleed, docW, docH, qty, sheets) {
+  const { cols, rows, cellW, cellH, sheetW, sheetH, margin, printW, printH, docRotated, sheetRotated, count } = L;
+  const cropSpace = 5;
+  const usedW = cols * cellW + (cols - 1) * cropSpace;
+  const usedH = rows * cellH + (rows - 1) * cropSpace;
+  const startX = margin + (printW - usedW) / 2;
+  const startY = margin + (printH - usedH) / 2;
+  const trimW = docRotated ? docH : docW;
+  const trimH = docRotated ? docW : docH;
+
+  const vCuts = new Set(), hCuts = new Set();
+  for (let c = 0; c < cols; c++) {
+    vCuts.add(+(startX + bleed + c * (cellW + cropSpace)).toFixed(1));
+    vCuts.add(+(startX + bleed + c * (cellW + cropSpace) + trimW).toFixed(1));
+  }
+  for (let r = 0; r < rows; r++) {
+    hCuts.add(+(startY + bleed + r * (cellH + cropSpace)).toFixed(1));
+    hCuts.add(+(startY + bleed + r * (cellH + cropSpace) + trimH).toFixed(1));
+  }
+
+  const vArr = [...vCuts].sort((a, b) => a - b);
+  const hArr = [...hCuts].sort((a, b) => a - b);
+  const sfmt = document.getElementById('sheetFormat').value;
+  const dfmt = document.getElementById('docFormat').value;
+  const docLabel = dfmt === 'custom' ? `${docW}x${docH}mm` : dfmt === 'same' ? `${docW}x${docH}mm` : dfmt;
+
+  let html = `<h2>Istruzioni di taglio</h2><ol>`;
+  html += `<li>Stampa <strong>${sheets} fogli ${sfmt}${sheetRotated ? ' (oriz.)' : ''}</strong> con <strong>${count} copie ${docLabel}</strong> ciascuno.</li>`;
+
+  if (uploadedFile && dfmt !== 'same') {
+    const [rW, rH] = getRotatedSourceSize();
+    const pct = Math.round(Math.min(docW / rW, docH / rH) * (contentZoom / 100) * 100);
+    html += `<li>Documento ${pct > 100 ? 'ingrandito' : 'ridotto'} al <strong>${pct}%</strong>${getTotalRotation() ? `, ruotato <strong>${getTotalRotation()}&deg;</strong>` : ''}.</li>`;
+  }
+
+  if (bleed > 0) html += `<li>Abbondanza: <strong>${bleed}mm/lato</strong>. Tagliare sui segni verdi.</li>`;
+
+  html += `<li><strong>Tagli verticali</strong> (da sinistra):<br>`;
+  vArr.forEach((v, i) => html += `&#8226; ${i + 1}: <strong>${v} mm</strong><br>`);
+  html += `</li><li><strong>Tagli orizzontali</strong> (dall'alto):<br>`;
+  hArr.forEach((h, i) => html += `&#8226; ${i + 1}: <strong>${h} mm</strong><br>`);
+  html += `</li>`;
+
+  html += `<li><strong>Procedura:</strong> impilare max 20-30 fogli, tagli verticali prima, poi orizzontali, rimuovere refili.</li>`;
+  const extra = sheets * count - qty;
+  html += `<li>Totale: <strong>${qty}</strong> copie, <strong>${sheets}</strong> fogli, <strong>${sheets * count}</strong> stampate${extra > 0 ? ` (${extra} extra)` : ''}.</li>`;
+  html += `</ol>`;
+
+  html += `<div class="info-box info-yellow"><strong>Taglierina:</strong> Usa leva o rullo con guida mm. Per grandi quantita, ghigliottina con battuta.</div>`;
+
+  if (bleed > 0) {
+    const canBleed = margin <= (sheetW - usedW) / 2;
+    html += canBleed
+      ? `<div class="info-box info-green"><strong>Stampa al vivo OK</strong> su ${sfmt}.</div>`
+      : `<div class="info-box info-red"><strong>Attenzione:</strong> margine stampante potrebbe tagliare il bleed. Prova SRA3 o 13x19".</div>`;
+  }
+
+  document.getElementById('cutInstructions').innerHTML = html;
+}
+
+// PDF Generation
+document.getElementById('btnGenerate').addEventListener('click', generatePDF);
+
+// pdf-lib accetta solo JPG e PNG: gli altri formati si convertono in PNG dall'immagine gia' decodificata
+async function embedAnyImage(outPdf, file, decodedImg) {
+  const bytes = new Uint8Array(file.data.slice(0));
+  const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
+  const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8;
+  if (isPng) return outPdf.embedPng(bytes);
+  if (isJpg) return outPdf.embedJpg(bytes);
+  const cv = document.createElement('canvas');
+  cv.width = decodedImg.naturalWidth; cv.height = decodedImg.naturalHeight;
+  cv.getContext('2d').drawImage(decodedImg, 0, 0);
+  const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+  return outPdf.embedPng(new Uint8Array(await blob.arrayBuffer()));
+}
+
+async function generatePDF() {
+  if (!uploadedFile) return;
+  showLoading('Generazione PDF imposto...');
+
+  try {
+    const [docW, docH] = getDocSize();
+    const [sheetW, sheetH] = getSheetSize();
+    const bleed = parseFloat(document.getElementById('bleed').value) || 0;
+    const margin = parseFloat(document.getElementById('printerMargin').value) || 0;
+    const showCropMarks = document.getElementById('showCropMarks').checked;
+    const fillMode = document.getElementById('fillMode').value;
+
+    // Use zoomed dimensions (same as calculate)
+    const zoomFactor = contentZoom / 100;
+    const scaledDocW = docW * zoomFactor;
+    const scaledDocH = docH * zoomFactor;
+
+    const docBW = scaledDocW + bleed * 2;
+    const docBH = scaledDocH + bleed * 2;
+    const cropSpace = showCropMarks ? 5 : 0;
+
+    let best = findBestLayout(docBW, docBH, sheetW, sheetH, margin, cropSpace);
+    if (!best) {
+      throw new Error(`il formato (${docBW.toFixed(0)} x ${docBH.toFixed(0)} mm con abbondanza) non entra nel foglio ${sheetW} x ${sheetH} mm `
+        + `con margine ${margin} mm: riduci abbondanza e segni di taglio, oppure scegli un foglio piu' grande`);
+    }
+
+    const { cols, rows, cellW, cellH, docRotated } = best;
+    const usedW = cols * cellW + (cols - 1) * cropSpace;
+    const usedH = rows * cellH + (rows - 1) * cropSpace;
+    const startX = margin + (best.printW - usedW) / 2;
+    const startY = margin + (best.printH - usedH) / 2;
+
+    const outPdf = await PDFLib.PDFDocument.create();
+    const page = outPdf.addPage([best.sheetW * MM_TO_PT, best.sheetH * MM_TO_PT]);
+
+    // Embed source
+    let embeddedPage = null;
+    let embeddedImage = null;
+    let srcW, srcH, srcPageRot = 0;
+
+    if (uploadedFile.type === 'pdf') {
+      const srcDoc = await PDFLib.PDFDocument.load(uploadedFile.data.slice(0));
+      const pn = Math.min(parseInt(document.getElementById('pdfPage').value) || 1, srcDoc.getPageCount()) - 1;
+      const [emb] = await outPdf.embedPdf(srcDoc, [pn]);
+      embeddedPage = emb;
+      srcW = emb.width;
+      srcH = emb.height;
+      // pdf-lib ignora /Rotate della pagina: la si aggiunge alla rotazione (l'anteprima di pdf.js la applica gia')
+      srcPageRot = ((srcDoc.getPage(pn).getRotation().angle % 360) + 360) % 360;
+    } else {
+      embeddedImage = await embedAnyImage(outPdf, uploadedFile, pageImage);
+      srcW = embeddedImage.width;
+      srcH = embeddedImage.height;
+    }
+
+    const rotCW = (cellRotation(docRotated) + srcPageRot) % 360;
+    const trimWc = docRotated ? scaledDocH : scaledDocW;
+    const trimHc = docRotated ? scaledDocW : scaledDocH;
+    const pl = contentPlacement(trimWc, trimHc, bleed, srcW, srcH, rotCW);
+
+    // Place copies
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const cellX = startX + c * (cellW + cropSpace);
+        const cellYfromTop = startY + r * (cellH + cropSpace);
+        const cellYpdf = best.sheetH - cellYfromTop - cellH;      // PDF: y dal basso
+        const centerXpt = (cellX + cellW / 2 + contentOffsetX) * MM_TO_PT;
+        const centerYpt = (cellYpdf + cellH / 2 - contentOffsetY) * MM_TO_PT;
+
+        // ogni copia resta nella sua cella (formato + abbondanza): niente sbordature sulle vicine
+        pdfClip(page, cellX * MM_TO_PT, cellYpdf * MM_TO_PT, cellW * MM_TO_PT, cellH * MM_TO_PT);
+        pdfDrawCentered(page, embeddedPage || embeddedImage, !!embeddedImage, centerXpt, centerYpt,
+                        pl.w * MM_TO_PT, pl.h * MM_TO_PT, rotCW);
+        pdfUnclip(page);
+
+        // Crop marks
+        if (showCropMarks) {
+          const trimW = docRotated ? scaledDocH : scaledDocW;
+          const trimH = docRotated ? scaledDocW : scaledDocH;
+          const txMark = (cellX + bleed) * MM_TO_PT;
+          const tyMark = cellYpdf * MM_TO_PT + (cellH - bleed) * MM_TO_PT;
+          const twMark = trimW * MM_TO_PT;
+          const thMark = trimH * MM_TO_PT;
+          const btyMark = tyMark - thMark;
+
+          const len = 4 * MM_TO_PT;
+          const gap = 1.5 * MM_TO_PT;
+
+          [
+            [txMark - gap, tyMark, txMark - gap - len, tyMark],
+            [txMark, tyMark + gap, txMark, tyMark + gap + len],
+            [txMark + twMark + gap, tyMark, txMark + twMark + gap + len, tyMark],
+            [txMark + twMark, tyMark + gap, txMark + twMark, tyMark + gap + len],
+            [txMark - gap, btyMark, txMark - gap - len, btyMark],
+            [txMark, btyMark - gap, txMark, btyMark - gap - len],
+            [txMark + twMark + gap, btyMark, txMark + twMark + gap + len, btyMark],
+            [txMark + twMark, btyMark - gap, txMark + twMark, btyMark - gap - len],
+          ].forEach(([x1, y1, x2, y2]) => {
+            page.drawLine({
+              start: { x: x1, y: y1 }, end: { x: x2, y: y2 },
+              thickness: 0.3, color: PDFLib.rgb(0, 0, 0),
+            });
+          });
+        }
+      }
+    }
+
+    // === LINEE DI TAGLIO ETICHETTATE SULLA PAGINA DI STAMPA ===
+    const fontCut = await outPdf.embedFont(PDFLib.StandardFonts.HelveticaBold);
+    const fontCutNorm = await outPdf.embedFont(PDFLib.StandardFonts.Helvetica);
+    const pgW = best.sheetW * MM_TO_PT;
+    const pgH = best.sheetH * MM_TO_PT;
+
+    {
+      const trimW2 = docRotated ? scaledDocH : scaledDocW;
+      const trimH2 = docRotated ? scaledDocW : scaledDocH;
+      const cs2 = cropSpace;
+      const uW2 = cols * cellW + (cols - 1) * cs2;
+      const uH2 = rows * cellH + (rows - 1) * cs2;
+      const sX2 = margin + (best.printW - uW2) / 2;
+      const sY2 = margin + (best.printH - uH2) / 2;
+
+      const vSet = new Set(), hSet = new Set();
+      for (let ci = 0; ci < cols; ci++) {
+        vSet.add(+(sX2 + bleed + ci * (cellW + cs2)).toFixed(1));
+        vSet.add(+(sX2 + bleed + ci * (cellW + cs2) + trimW2).toFixed(1));
+      }
+      for (let ri = 0; ri < rows; ri++) {
+        hSet.add(+(sY2 + bleed + ri * (cellH + cs2)).toFixed(1));
+        hSet.add(+(sY2 + bleed + ri * (cellH + cs2) + trimH2).toFixed(1));
+      }
+      const vArr2 = [...vSet].sort((a, b) => a - b);
+      const hArr2 = [...hSet].sort((a, b) => a - b);
+      // fasce occupate dalle copie (pt): le linee guida si tracciano solo FUORI, mai sopra le immagini
+      const rowBands = [], colBands = [];
+      for (let ri = 0; ri < rows; ri++) {
+        const top = sY2 + ri * (cellH + cs2);
+        rowBands.push([(best.sheetH - top - cellH) * MM_TO_PT, (best.sheetH - top) * MM_TO_PT]);
+      }
+      for (let ci = 0; ci < cols; ci++) {
+        const left = sX2 + ci * (cellW + cs2);
+        colBands.push([left * MM_TO_PT, (left + cellW) * MM_TO_PT]);
+      }
+      const freeOf = (bands, a, b) => !bands.some(([u, v]) => b > u && a < v);
+      const mPt = margin * MM_TO_PT;
+
+      // Draw full-height vertical cut lines with labels
+      const vColor = PDFLib.rgb(0.85, 0.15, 0.25);
+      const globalCutNum = { n: 0 }; // running cut sequence across V and H
+      vArr2.forEach((vMm, idx) => {
+        globalCutNum.n++;
+        const xPt = vMm * MM_TO_PT;
+        const seqLabel = `#${globalCutNum.n}`;
+        const label = `V${idx + 1}`;
+        const posLabel = `${vMm.toFixed(1)}mm`;
+        const distLabel = idx > 0 ? `(+${(vMm - vArr2[idx - 1]).toFixed(1)}mm)` : `(da sx)`;
+
+        // Dashed line full height
+        const dashLen = 6, dashGap = 4;
+        for (let yy = 0; yy < pgH; yy += dashLen + dashGap) {
+          const y2 = Math.min(yy + dashLen, pgH);
+          if (!freeOf(rowBands, yy, y2)) continue;
+          page.drawLine({
+            start: { x: xPt, y: yy }, end: { x: xPt, y: y2 },
+            thickness: 0.3, color: vColor,
+          });
+        }
+
+        // Label at top: sequence + name + position + distance
+        page.drawText(`${seqLabel} ${label}`, {
+          x: xPt + 2, y: pgH - mPt - 7,
+          size: 6, font: fontCut, color: vColor,
+        });
+        page.drawText(`${posLabel} ${distLabel}`, {
+          x: xPt + 2, y: pgH - mPt - 14,
+          size: 5, font: fontCutNorm, color: vColor,
+        });
+
+        // Label at bottom
+        page.drawText(`${seqLabel} ${label}`, {
+          x: xPt + 2, y: mPt + 8,
+          size: 6, font: fontCut, color: vColor,
+        });
+        page.drawText(`${posLabel} ${distLabel}`, {
+          x: xPt + 2, y: mPt + 1,
+          size: 5, font: fontCutNorm, color: vColor,
+        });
+      });
+
+      // Draw full-width horizontal cut lines with labels
+      const hColor = PDFLib.rgb(0.1, 0.4, 0.85);
+      hArr2.forEach((hMm, idx) => {
+        globalCutNum.n++;
+        const yPt = (best.sheetH - hMm) * MM_TO_PT;
+        const seqLabel = `#${globalCutNum.n}`;
+        const label = `H${idx + 1}`;
+        const posLabel = `${hMm.toFixed(1)}mm`;
+        const distLabel = idx > 0 ? `(+${(hMm - hArr2[idx - 1]).toFixed(1)}mm)` : `(da alto)`;
+
+        // Dashed line full width
+        const dashLen = 6, dashGap = 4;
+        for (let xx = 0; xx < pgW; xx += dashLen + dashGap) {
+          const x2 = Math.min(xx + dashLen, pgW);
+          if (!freeOf(colBands, xx, x2)) continue;
+          page.drawLine({
+            start: { x: xx, y: yPt }, end: { x: x2, y: yPt },
+            thickness: 0.3, color: hColor,
+          });
+        }
+
+        // Label at left: sequence + name + position + distance
+        page.drawText(`${seqLabel} ${label}`, {
+          x: mPt + 2, y: yPt + 2,
+          size: 6, font: fontCut, color: hColor,
+        });
+        page.drawText(`${posLabel} ${distLabel}`, {
+          x: mPt + 2, y: yPt - 8,
+          size: 5, font: fontCutNorm, color: hColor,
+        });
+
+        // Label at right
+        const rText = `${seqLabel} ${label}`;
+        const rW = fontCut.widthOfTextAtSize(rText, 6);
+        page.drawText(rText, {
+          x: pgW - mPt - rW - 2, y: yPt + 2,
+          size: 6, font: fontCut, color: hColor,
+        });
+        const rPosText = `${posLabel} ${distLabel}`;
+        const rPW = fontCutNorm.widthOfTextAtSize(rPosText, 5);
+        page.drawText(rPosText, {
+          x: pgW - mPt - rPW - 2, y: yPt - 8,
+          size: 5, font: fontCutNorm, color: hColor,
+        });
+
+        // No midpoint label - avoid overlapping content
+      });
+    }
+
+    // === PAGINA 2: LEGENDA TAGLIO DETTAGLIATA ===
+    const font = fontCutNorm;
+    const fontBold = fontCut;
+    const pageW_pt = pgW;
+    const pageH_pt = pgH;
+
+    // Recalculate cut positions for legend page
+    const vCutsArr = (() => {
+      const s = new Set();
+      const tw = docRotated ? scaledDocH : scaledDocW;
+      const cs = cropSpace;
+      const uw = cols * cellW + (cols - 1) * cs;
+      const sx = margin + (best.printW - uw) / 2;
+      for (let ci = 0; ci < cols; ci++) {
+        s.add(+(sx + bleed + ci * (cellW + cs)).toFixed(1));
+        s.add(+(sx + bleed + ci * (cellW + cs) + tw).toFixed(1));
+      }
+      return [...s].sort((a, b) => a - b);
+    })();
+
+    const hCutsArr = (() => {
+      const s = new Set();
+      const th = docRotated ? scaledDocW : scaledDocH;
+      const cs = cropSpace;
+      const uh = rows * cellH + (rows - 1) * cs;
+      const sy = margin + (best.printH - uh) / 2;
+      for (let ri = 0; ri < rows; ri++) {
+        s.add(+(sy + bleed + ri * (cellH + cs)).toFixed(1));
+        s.add(+(sy + bleed + ri * (cellH + cs) + th).toFixed(1));
+      }
+      return [...s].sort((a, b) => a - b);
+    })();
+
+    const legendPage = outPdf.addPage([pageW_pt, pageH_pt]);
+    let ly = pageH_pt - 30;
+    const lx = 30;
+    const lineH = 14;
+
+    // Title
+    legendPage.drawText('GUIDA AL TAGLIO', {
+      x: lx, y: ly, size: 16, font: fontBold, color: PDFLib.rgb(0.8, 0, 0.2),
+    });
+    ly -= 24;
+
+    // Summary
+    const sfmt2 = document.getElementById('sheetFormat').value;
+    const dfmt2 = document.getElementById('docFormat').value;
+    const docLabel2 = dfmt2 === 'custom' ? `${docW}x${docH}mm` : dfmt2 === 'same' ? `${scaledDocW.toFixed(1)}x${scaledDocH.toFixed(1)}mm` : dfmt2;
+
+    legendPage.drawText(`Foglio: ${sfmt2} (${best.sheetW}x${best.sheetH}mm)   Formato finale: ${docLabel2}   Copie/foglio: ${best.count} (${cols}x${rows})`, {
+      x: lx, y: ly, size: 9, font: font, color: PDFLib.rgb(0.2, 0.2, 0.2),
+    });
+    ly -= 8;
+    if (bleed > 0) {
+      legendPage.drawText(`Abbondanza: ${bleed}mm per lato   Zoom: ${contentZoom}%`, {
+        x: lx, y: ly, size: 9, font: font, color: PDFLib.rgb(0.2, 0.2, 0.2),
+      });
+    }
+    ly -= 22;
+
+    // Vertical cuts section
+    legendPage.drawText('TAGLI VERTICALI (rosso)', {
+      x: lx, y: ly, size: 11, font: fontBold, color: PDFLib.rgb(0.8, 0, 0.2),
+    });
+    ly -= 6;
+    // Red line under title
+    legendPage.drawLine({
+      start: { x: lx, y: ly }, end: { x: lx + 250, y: ly },
+      thickness: 1, color: PDFLib.rgb(0.8, 0, 0.2),
+    });
+    ly -= lineH + 2;
+
+    legendPage.drawText('Eseguire PRIMA tutti i tagli verticali, dall\'alto verso il basso.', {
+      x: lx, y: ly, size: 8, font: font, color: PDFLib.rgb(0.4, 0.4, 0.4),
+    });
+    ly -= lineH;
+
+    let legendSeq = 0;
+    vCutsArr.forEach((vMm, idx) => {
+      legendSeq++;
+      const label = `#${legendSeq} - Taglio V${idx + 1}`;
+      const dist = idx > 0 ? ` (+${(vMm - vCutsArr[idx - 1]).toFixed(1)}mm dal precedente)` : '';
+      const pos = `a ${vMm.toFixed(1)} mm dal bordo sinistro${dist}`;
+
+      legendPage.drawText(label, {
+        x: lx, y: ly, size: 10, font: fontBold, color: PDFLib.rgb(0.8, 0, 0.2),
+      });
+      legendPage.drawText(pos, {
+        x: lx + 100, y: ly, size: 9, font: font, color: PDFLib.rgb(0.15, 0.15, 0.15),
+      });
+
+      // Dotted guide line
+      for (let dx = lx + 340; dx < lx + 420; dx += 4) {
+        legendPage.drawLine({
+          start: { x: dx, y: ly + 4 }, end: { x: dx + 2, y: ly + 4 },
+          thickness: 0.3, color: PDFLib.rgb(0.8, 0.8, 0.8),
+        });
+      }
+
+      // Checkbox square
+      legendPage.drawRectangle({
+        x: lx + 425, y: ly - 1, width: 10, height: 10,
+        borderWidth: 0.5, borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+        color: PDFLib.rgb(1, 1, 1),
+      });
+
+      ly -= lineH;
+    });
+
+    ly -= 12;
+
+    // Horizontal cuts section
+    legendPage.drawText('TAGLI ORIZZONTALI (blu)', {
+      x: lx, y: ly, size: 11, font: fontBold, color: PDFLib.rgb(0, 0.4, 0.8),
+    });
+    ly -= 6;
+    legendPage.drawLine({
+      start: { x: lx, y: ly }, end: { x: lx + 250, y: ly },
+      thickness: 1, color: PDFLib.rgb(0, 0.4, 0.8),
+    });
+    ly -= lineH + 2;
+
+    legendPage.drawText('Dopo i tagli verticali, ruotare le strisce 90° e fare i tagli orizzontali.', {
+      x: lx, y: ly, size: 8, font: font, color: PDFLib.rgb(0.4, 0.4, 0.4),
+    });
+    ly -= lineH;
+
+    hCutsArr.forEach((hMm, idx) => {
+      legendSeq++;
+      const label = `#${legendSeq} - Taglio H${idx + 1}`;
+      const dist = idx > 0 ? ` (+${(hMm - hCutsArr[idx - 1]).toFixed(1)}mm dal precedente)` : '';
+      const pos = `a ${hMm.toFixed(1)} mm dal bordo superiore${dist}`;
+
+      legendPage.drawText(label, {
+        x: lx, y: ly, size: 10, font: fontBold, color: PDFLib.rgb(0, 0.4, 0.8),
+      });
+      legendPage.drawText(pos, {
+        x: lx + 100, y: ly, size: 9, font: font, color: PDFLib.rgb(0.15, 0.15, 0.15),
+      });
+
+      for (let dx = lx + 340; dx < lx + 420; dx += 4) {
+        legendPage.drawLine({
+          start: { x: dx, y: ly + 4 }, end: { x: dx + 2, y: ly + 4 },
+          thickness: 0.3, color: PDFLib.rgb(0.8, 0.8, 0.8),
+        });
+      }
+
+      legendPage.drawRectangle({
+        x: lx + 425, y: ly - 1, width: 10, height: 10,
+        borderWidth: 0.5, borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+        color: PDFLib.rgb(1, 1, 1),
+      });
+
+      ly -= lineH;
+    });
+
+    ly -= 16;
+
+    // Procedure box
+    legendPage.drawRectangle({
+      x: lx - 8, y: ly - 80, width: 380, height: 90,
+      borderWidth: 0.8, borderColor: PDFLib.rgb(0.7, 0.7, 0.7),
+      color: PDFLib.rgb(0.97, 0.97, 0.97),
+    });
+
+    ly -= 4;
+    legendPage.drawText('PROCEDURA', {
+      x: lx, y: ly, size: 10, font: fontBold, color: PDFLib.rgb(0.2, 0.2, 0.2),
+    });
+    ly -= lineH;
+
+    const steps = [
+      '1. Impilare max 20-30 fogli alla volta',
+      '2. Eseguire TUTTI i tagli verticali (V1, V2...)',
+      '3. Ruotare le strisce ottenute di 90°',
+      '4. Eseguire TUTTI i tagli orizzontali (H1, H2...)',
+      '5. Rimuovere i refili (bordi di abbondanza)',
+      `6. Risultato: ${best.count} copie ${docLabel2} per foglio`,
+    ];
+    steps.forEach(step => {
+      legendPage.drawText(step, {
+        x: lx, y: ly, size: 8.5, font: font, color: PDFLib.rgb(0.25, 0.25, 0.25),
+      });
+      ly -= 11;
+    });
+
+    // === MINIATURA SCHEMA sulla pagina legenda ===
+    // Draw a small schematic of the sheet with numbered cuts
+    const schemaX = lx;
+    const schemaY = ly - 20;
+    const schemaScale = 0.5; // scale factor for miniature
+    const schW = best.sheetW * schemaScale;
+    const schH = best.sheetH * schemaScale;
+
+    // Sheet outline
+    legendPage.drawRectangle({
+      x: schemaX, y: schemaY - schH, width: schW, height: schH,
+      borderWidth: 0.5, borderColor: PDFLib.rgb(0.5, 0.5, 0.5),
+      color: PDFLib.rgb(1, 1, 1),
+    });
+
+    // Draw V cut lines on miniature
+    vCutsArr.forEach((vMm, idx) => {
+      const sx = schemaX + vMm * schemaScale;
+      legendPage.drawLine({
+        start: { x: sx, y: schemaY },
+        end: { x: sx, y: schemaY - schH },
+        thickness: 0.4,
+        color: PDFLib.rgb(0.8, 0, 0.2),
+      });
+      legendPage.drawText(`V${idx + 1}`, {
+        x: sx + 1, y: schemaY + 3, size: 5, font: fontBold,
+        color: PDFLib.rgb(0.8, 0, 0.2),
+      });
+    });
+
+    // Draw H cut lines on miniature
+    hCutsArr.forEach((hMm, idx) => {
+      const sy = schemaY - hMm * schemaScale;
+      legendPage.drawLine({
+        start: { x: schemaX, y: sy },
+        end: { x: schemaX + schW, y: sy },
+        thickness: 0.4,
+        color: PDFLib.rgb(0, 0.4, 0.8),
+      });
+      legendPage.drawText(`H${idx + 1}`, {
+        x: schemaX - 16, y: sy - 2, size: 5, font: fontBold,
+        color: PDFLib.rgb(0, 0.4, 0.8),
+      });
+    });
+
+    // Label miniature
+    legendPage.drawText(`Schema foglio ${sfmt2}`, {
+      x: schemaX, y: schemaY - schH - 12, size: 7, font: font,
+      color: PDFLib.rgb(0.4, 0.4, 0.4),
+    });
+
+    const pdfBytes = await outPdf.save();
+    await savePdf(pdfBytes, `imposizione_${document.getElementById('docFormat').value}_su_${document.getElementById('sheetFormat').value}.pdf`);
+  } catch (e) {
+    lastPrintMsg = e.message;
+    showMessage('Errore nella generazione del PDF: ' + e.message);
+    console.error(e);
+  }
+  hideLoading();
+}
+
+function showLoading(t) {
+  document.getElementById('loadingText').textContent = t;
+  document.getElementById('loading').classList.remove('hidden');
+}
+function hideLoading() { document.getElementById('loading').classList.add('hidden'); }
+
+// Global events
+document.querySelectorAll('#docFormat, #sheetFormat, #qty, #bleed, #printerMargin, #showCropMarks, #showBleed, #customDocW, #customDocH, #forceCopies').forEach(el => {
+  el.addEventListener('change', () => { applyAutoRotation(); calculate(); });
+  el.addEventListener('input', () => { applyAutoRotation(); calculate(); });
+});
+
+document.getElementById('docFormat').addEventListener('change', function () {
+  document.getElementById('customDocFields').style.display = this.value === 'custom' ? 'block' : 'none';
+});
+
+document.getElementById('copiesMode').addEventListener('change', function () {
+  document.getElementById('forceCopiesField').style.display = this.value === 'force' ? 'block' : 'none';
+  calculate();
+});
+
+document.getElementById('printerSelect').addEventListener('change', function () {
+  const opt = this.options[this.selectedIndex];
+  const margin = parseFloat(opt.dataset.margin);
+  document.getElementById('printerMargin').value = margin;
+  document.getElementById('customMarginField').style.display =
+    this.value === 'custom' ? 'block' : 'block'; // always show so user can tweak
+  applyAutoRotation();
+  calculate();
+});
+
+if (NATIVE) {
+  document.getElementById('btnPrint').hidden = false;
+  document.getElementById('btnBatch').hidden = false;
+  window.webkit.messageHandlers.native.postMessage({ action: 'listPrinters' });
+}
+
+// Menu stampanti: in app si mostrano solo quelle installate sul Mac (nomi CUPS reali).
+window.nativePrinters = function (names) {
+  if (!names.length) return;
+  const sel = document.getElementById('printerSelect');
+  const known = {};
+  Array.from(sel.options).forEach(o => { if (o.value !== 'custom') known[o.value] = o; });
+  const prev = sel.value;
+  const margins = { EPSON_SL_D700: 0, Canon_TM_300: 3, Olivetti_454: 4.2, OKI_DATA_CORP_C911_2: 4.6, HP_LaserJet_P2015: 6.3 };
+  sel.innerHTML = '<option value="custom" data-margin="5">Personalizzato (solo PDF)...</option>';
+  names.forEach(n => {
+    const o = document.createElement('option');
+    o.value = n;
+    o.dataset.margin = (n in margins) ? margins[n] : (known[n] ? known[n].dataset.margin : 4.6);
+    o.textContent = n.replace(/_/g, ' ') + ' (' + o.dataset.margin + 'mm)';
+    sel.appendChild(o);
+  });
+  sel.value = names.includes(prev) ? prev : names.includes('EPSON_SL_D700') ? 'EPSON_SL_D700' : names[0];
+  sel.dispatchEvent(new Event('change'));
+};
+
+// === Stampa di una cartella di foto: ogni foto -> un foglio con le impostazioni correnti ===
+let batchList = [], batchStop = false;
+window.nativeFolder = function (r) {
+  if (r.cancelled) return;
+  batchList = r.files;
+  const box = document.getElementById('batchBox');
+  box.hidden = false;
+  document.getElementById('batchGo').hidden = batchList.length === 0;
+  document.getElementById('batchText').textContent = batchList.length
+    ? `Cartella "${r.name}": ${batchList.length} foto (JPG/PNG/TIFF). Ognuna va su un foglio ${document.getElementById('sheetFormat').value} `
+      + `(${document.getElementById('docFormat').value}, ${document.getElementById('qty').value} copie) sulla stampante ${document.getElementById('printerSelect').value}.`
+    : `Nella cartella "${r.name}" non ci sono foto JPG, PNG o TIFF.`;
+};
+document.getElementById('btnBatch').addEventListener('click', () => {
+  if (!batchRunning) window.webkit.messageHandlers.native.postMessage({ action: 'pickFolder' });
+});
+document.getElementById('batchStop').addEventListener('click', () => { batchStop = true; });
+document.getElementById('batchGo').addEventListener('click', async () => {
+  if (batchRunning || !batchList.length) return;
+  if (document.getElementById('printerSelect').value === 'custom') {
+    showMessage('Scegli una stampante installata nel menu "Stampante": con "Personalizzato" non si puo\' stampare.'); return;
+  }
+  batchRunning = true; batchStop = false;
+  document.getElementById('batchStop').hidden = false;
+  document.getElementById('batchGo').hidden = true;
+  const text = document.getElementById('batchText');
+  const failed = [];
+  let sent = 0;
+  for (let i = 0; i < batchList.length && !batchStop; i++) {
+    text.textContent = `Foto ${i + 1} di ${batchList.length}: ${batchList[i]}`;
+    const f = await nativeCall({ action: 'readBatchFile', index: i });
+    if (f.error) { failed.push(`${batchList[i]} (${f.error})`); continue; }
+    const bin = atob(f.b64), buf = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) buf[k] = bin.charCodeAt(k);
+    uploadedFile = null;                       // se la foto non si legge non si ristampa la precedente
+    await handleFile(new File([buf], f.name, { type: f.mime }));
+    if (!uploadedFile) { failed.push(`${f.name} (immagine non leggibile)`); continue; }
+    printAfterGenerate = true; lastPrintOk = false; lastPrintMsg = '';
+    await generatePDF();
+    printAfterGenerate = false;
+    if (lastPrintOk) sent++; else { failed.push(`${f.name} (${lastPrintMsg || 'errore'})`); if (/non e' installata/.test(lastPrintMsg)) break; }
+  }
+  batchRunning = false;
+  document.getElementById('batchStop').hidden = true;
+  document.getElementById('batchGo').hidden = false;
+  text.textContent = `${batchStop ? 'Fermato' : 'Finito'}: ${sent} di ${batchList.length} foto inviate alla stampante.`
+    + (failed.length ? ' Non stampate: ' + failed.join('; ') : '');
+  showMessage(text.textContent, failed.length === 0 && !batchStop);
+});
+document.getElementById('btnPrint').addEventListener('click', () => { printAfterGenerate = true; generatePDF(); });
+
+calculate();
+
+// === PAN / DRAG (manina) ===
+{
+  const cvs = document.getElementById('preview');
+  let dragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let dragStartOffX = 0, dragStartOffY = 0;
+
+  function startDrag(px, py) {
+    if (!contentOverflows || !pageImage) return;
+    dragging = true;
+    dragStartX = px;
+    dragStartY = py;
+    dragStartOffX = contentOffsetX;
+    dragStartOffY = contentOffsetY;
+    cvs.classList.add('panning');
+  }
+
+  function moveDrag(px, py) {
+    if (!dragging) return;
+    // Convert pixel delta to mm using the preview scale
+    // Account for canvas CSS scaling (canvas may be rendered smaller via max-width)
+    const cssScale = cvs.clientWidth / cvs.width;
+    const deltaPx_X = px - dragStartX;
+    const deltaPx_Y = py - dragStartY;
+    const deltaMm_X = deltaPx_X / (previewScale * cssScale);
+    const deltaMm_Y = deltaPx_Y / (previewScale * cssScale);
+
+    contentOffsetX = Math.round((dragStartOffX + deltaMm_X) * 10) / 10;
+    contentOffsetY = Math.round((dragStartOffY + deltaMm_Y) * 10) / 10;
+
+    document.getElementById('offsetX').value = contentOffsetX;
+    document.getElementById('offsetY').value = contentOffsetY;
+    calculate();
+  }
+
+  function endDrag() {
+    if (!dragging) return;
+    dragging = false;
+    cvs.classList.remove('panning');
+  }
+
+  // Mouse
+  cvs.addEventListener('mousedown', e => {
+    if (!contentOverflows) return;
+    e.preventDefault();
+    startDrag(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', e => {
+    if (dragging) { e.preventDefault(); moveDrag(e.clientX, e.clientY); }
+  });
+  window.addEventListener('mouseup', endDrag);
+
+  // Touch
+  cvs.addEventListener('touchstart', e => {
+    if (!contentOverflows || e.touches.length !== 1) return;
+    e.preventDefault();
+    const t = e.touches[0];
+    startDrag(t.clientX, t.clientY);
+  }, { passive: false });
+  window.addEventListener('touchmove', e => {
+    if (dragging && e.touches.length === 1) {
+      e.preventDefault();
+      moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, { passive: false });
+  window.addEventListener('touchend', endDrag);
+  window.addEventListener('touchcancel', endDrag);
+
+  // Mouse wheel zoom on canvas
+  cvs.addEventListener('wheel', e => {
+    if (!pageImage) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -5 : 5;
+    contentZoom = Math.max(25, Math.min(250, contentZoom + delta));
+    document.getElementById('zoomSlider').value = contentZoom;
+    document.getElementById('zoomVal').textContent = contentZoom + '%';
+    calculate();
+  }, { passive: false });
+}
+</script>
+<script>
+// ===================== MODALITA' LIBRO (brossura / punto metallico) =====================
+// Pagine (doppie o singole) imposte su fogli piegati a meta'. Ogni foglio = 4 pagine.
+//  Brossura: fogli piegati uno a uno e impilati -> foglio k: fronte [4k+4 | 4k+1], retro [4k+2 | 4k+3]
+//  Punto metallico: fogli uno dentro l'altro    -> foglio i: fronte [N-2i | 2i+1], retro [2i+2 | N-2i-1]
+// In entrambi le pagine pari stanno a sinistra della piega e le dispari a destra.
+// Prolunga sul dorso (G): ogni pagina e' larga G in piu' verso la piega e il suo contenuto e' spostato
+// di G verso l'esterno; nella striscia in piu' c'e' la continuazione della pagina accanto (il pezzo di
+// foto oltre il centro). Dopo la rilegatura la striscia sta nel dorso e la foto e' continua.
+(function () {
+  const $ = id => document.getElementById(id);
+  const SHEETS = { 'A4': [297, 210], 'A3': [420, 297], 'SRA3': [450, 320], '12x18': [457.2, 304.8], '13x19': [482.6, 330.2] };
+  const MARK_GAP = 3, MARK_LEN = 8;                  // segni di taglio: distanza dall'abbondanza e lunghezza (mm)
+  const DPI = 300;
+
+  const bk = { sources: [], pages: [], side: 0, opening: 0, baseName: 'libro', userSize: false };
+
+  // ---------- schede modalita' ----------
+  document.querySelectorAll('.mode-tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(x => x.classList.toggle('active', x === t));
+    ['modeCopies', 'modeBook'].forEach(id => { $(id).style.display = id === t.dataset.mode ? '' : 'none'; });
+    try { localStorage.setItem('impos_mode', t.dataset.mode); } catch (e) { /* niente */ }
+    if (t.dataset.mode === 'modeBook') refresh();
+  }));
+  try {
+    const m = localStorage.getItem('impos_mode');
+    if (m === 'modeBook') document.querySelector('.mode-tab[data-mode="modeBook"]').click();
+  } catch (e) { /* niente */ }
+
+  // ---------- caricamento ----------
+  const up = $('bkUpload'), inp = $('bkFiles');
+  up.addEventListener('click', () => inp.click());
+  up.addEventListener('dragover', e => { e.preventDefault(); up.classList.add('dragover'); });
+  up.addEventListener('dragleave', () => up.classList.remove('dragover'));
+  up.addEventListener('drop', e => { e.preventDefault(); up.classList.remove('dragover'); loadFiles([...e.dataTransfer.files]); });
+  inp.addEventListener('change', () => { if (inp.files.length) loadFiles([...inp.files]); inp.value = ''; });
+
+  const stem = n => n.replace(/\.[^.]+$/, '');
+  const natural = (a, b) => stem(a.name).localeCompare(stem(b.name), undefined, { numeric: true, sensitivity: 'base' });
+
+  async function loadFiles(files) {
+    files = files.filter(f => /\.(pdf|jpe?g|png|webp)$/i.test(f.name)).sort(natural);
+    if (!files.length) { showMessage('Nessun file utilizzabile: servono JPG, PNG, WebP o PDF.'); return; }
+    showLoading('Leggo i file...');
+    const out = [];
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        $('loadingText').textContent = `Leggo ${i + 1}/${files.length}: ${f.name}`;
+        const buf = await f.arrayBuffer();
+        if (/\.pdf$/i.test(f.name)) {
+          const doc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+          const holder = { bytes: buf, lib: null };          // pdf-lib si carica solo per il PDF finale
+          for (let p = 1; p <= doc.numPages; p++) {
+            const pg = await doc.getPage(p);
+            const vp1 = pg.getViewport({ scale: 1 });        // gia' ruotata secondo /Rotate
+            const sc = Math.min(2, 700 / Math.max(vp1.width, vp1.height));
+            const vp = pg.getViewport({ scale: sc });
+            const cv = document.createElement('canvas');
+            cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+            await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+            out.push({ kind: 'pdf', name: `${f.name} p.${p}`, holder, index: p - 1,
+                       vw: vp1.width, vh: vp1.height, rot: ((pg.rotate || 0) % 360 + 360) % 360, thumb: cv });
+          }
+        } else {
+          const img = await decode(buf, f.type);
+          const sc = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+          const cv = document.createElement('canvas');
+          cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          out.push({ kind: 'img', name: f.name, file: f, vw: img.naturalWidth, vh: img.naturalHeight, rot: 0, thumb: cv });
+        }
+      }
+    } catch (e) {
+      hideLoading();
+      showMessage('Errore nel leggere i file: ' + e.message);
+      return;
+    }
+    hideLoading();
+    bk.sources = out;
+    bk.baseName = stem(files[0].name).replace(/[^\w\- ]+/g, '').trim() || 'libro';
+    const wide = out.every(s => s.vw / s.vh >= 1.6);
+    $('bkContent').value = wide ? 'spreads' : 'single';
+    $('bkFileName').textContent = files.length === 1 ? files[0].name : `${files.length} file`;
+    $('bkFileInfo').textContent = `${out.length} ${out.length === 1 ? 'immagine/pagina' : 'immagini/pagine'}`
+      + (wide ? ' · sembrano doppie pagine' : '');
+    $('bkList').style.display = 'block';
+    $('bkList').innerHTML = out.map((s, i) => `${i + 1}. ${s.name}`).join('<br>');
+    bk.userSize = false;
+    bk.side = 0; bk.opening = 0;
+    $('bkGenerate').disabled = false;
+    setMaxSize();
+    refresh();
+  }
+
+  function decode(buf, type) {
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(new Blob([buf], { type: type || 'image/jpeg' }));
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = () => rej(new Error('immagine non leggibile dal browser'));
+      img.src = url;
+    });
+  }
+
+  // ---------- parametri e geometria (mm, origine in alto a sinistra) ----------
+  const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
+
+  function pageAspect() {
+    const s = bk.sources[0];
+    if (!s) return 1;
+    return $('bkContent').value === 'spreads' ? (s.vw / 2) / s.vh : s.vw / s.vh;
+  }
+
+  function geo() {
+    const [SW, SH] = SHEETS[$('bkSheet').value];
+    const TW = num('bkPageW', 200), TH = num('bkPageH', 200);
+    const B = Math.max(0, num('bkBleed', 3)), G = Math.max(0, num('bkGutter', 0)), M = Math.max(0, num('bkMargin', 4.6));
+    const marks = $('bkMarks').checked;
+    const FOLD = SW / 2, Y0 = (SH - TH) / 2;
+    const usedW = 2 * (TW + G + B), usedH = TH + 2 * B;
+    const availW = SW - 2 * M;
+    const availH = SH - 2 * M - (marks ? 2 * (MARK_GAP + MARK_LEN) : 0);
+    return { SW, SH, TW, TH, B, G, M, marks, FOLD, Y0, usedW, usedH, availW, availH,
+             fits: usedW <= availW + 0.01 && usedH <= availH + 0.01 };
+  }
+
+  function setMaxSize() {
+    const [SW, SH] = SHEETS[$('bkSheet').value];
+    const B = Math.max(0, num('bkBleed', 3)), G = Math.max(0, num('bkGutter', 0)), M = Math.max(0, num('bkMargin', 4.6));
+    const marks = $('bkMarks').checked;
+    const maxW = (SW - 2 * M) / 2 - G - B;
+    const maxH = SH - 2 * M - 2 * B - (marks ? 2 * (MARK_GAP + MARK_LEN) : 0);
+    const a = pageAspect();
+    let w = Math.min(maxW, maxH * a);
+    w = Math.floor(w * 2) / 2;                      // mezzo millimetro
+    let h = Math.floor((w / a) * 2) / 2;
+    $('bkPageW').value = w; $('bkPageH').value = h;
+  }
+
+  // ---------- pagine e imposizione ----------
+  function buildPages() {
+    const spreads = $('bkContent').value === 'spreads';
+    const ends = $('bkBlankEnds').checked;
+    const pages = [];
+    if (spreads) {
+      pages.push(null);                               // le doppie iniziano su pagina pari: la 1 e' bianca
+      bk.sources.forEach(s => { pages.push({ src: s, half: 0 }); pages.push({ src: s, half: 1 }); });
+    } else {
+      if (ends) pages.push(null);
+      bk.sources.forEach(s => pages.push({ src: s, half: -1 }));
+    }
+    const tail = ends ? 1 : 0;
+    const N = Math.max(4, Math.ceil((pages.length + tail) / 4) * 4);
+    while (pages.length < N - tail) pages.push(null);
+    if (tail) pages.push(null);
+    return pages;                                     // indice 0 = pagina 1
+  }
+
+  function sides(N) {
+    const out = [];
+    const saddle = $('bkBinding').value === 'saddle';
+    for (let k = 0; k < N / 4; k++) {
+      if (saddle) {
+        out.push({ sheet: k + 1, face: 'fronte', L: N - 2 * k, R: 2 * k + 1 });
+        out.push({ sheet: k + 1, face: 'retro', L: 2 * k + 2, R: N - 2 * k - 1 });
+      } else {
+        out.push({ sheet: k + 1, face: 'fronte', L: 4 * k + 4, R: 4 * k + 1 });
+        out.push({ sheet: k + 1, face: 'retro', L: 4 * k + 2, R: 4 * k + 3 });
+      }
+    }
+    return out;
+  }
+
+  // Contenuti da disegnare per la pagina p nella meta' 'side' (0 sinistra, 1 destra) del foglio.
+  // Ritorna { clip:[x,y,w,h], visible:[x,y,w,h], items:[{src, cx, cy, vw, vh}] } in mm.
+  function slot(g, p, side) {
+    const { TW, TH, B, G, FOLD, Y0 } = g;
+    const N = bk.pages.length;
+    const cx = side === 0 ? FOLD - G : FOLD + G;      // centro dell'apertura (punto della piega "vera")
+    const clip = side === 0 ? [FOLD - G - TW - B, Y0 - B, TW + G + B, TH + 2 * B]
+                            : [FOLD, Y0 - B, TW + G + B, TH + 2 * B];
+    const visible = side === 0 ? [FOLD - G - TW, Y0, TW, TH] : [FOLD + G, Y0, TW, TH];
+    const Lp = p % 2 === 0 ? p : p - 1, Rp = Lp + 1;  // apertura che contiene p
+    const pl = Lp >= 1 ? bk.pages[Lp - 1] : null;
+    const pr = Rp <= N ? bk.pages[Rp - 1] : null;
+    const fill = $('bkFill').value === 'fill';
+    const items = [];
+    const place = (src, bcx, boxW, boxH) => {         // centrato in (bcx, centro pagina), copre o adatta
+      const s = fill ? Math.max((boxW + 2 * B) / src.vw, (boxH + 2 * B) / src.vh)
+                     : Math.min(boxW / src.vw, boxH / src.vh);
+      items.push({ src, cx: bcx, cy: Y0 + TH / 2, vw: src.vw * s, vh: src.vh * s });
+    };
+    if (pl && pr && pl.src === pr.src && pl.half === 0 && pr.half === 1) {
+      place(pl.src, cx, 2 * TW, TH);                  // doppia pagina intera, centrata sulla piega
+    } else {
+      [[pl, cx - TW / 2], [pr, cx + TW / 2]].forEach(([pg, pcx]) => {
+        if (!pg) return;
+        if (pg.half === -1) place(pg.src, pcx, TW, TH);
+        else place(pg.src, cx, 2 * TW, TH);           // meta' di doppia isolata: doppia centrata sulla piega
+      });
+    }
+    return { clip, visible, items };
+  }
+
+  // ---------- riepilogo, anteprima, istruzioni ----------
+  function refresh() {
+    bk.pages = buildPages();
+    const g = geo();
+    const N = bk.pages.length, S = sides(N);
+    bk.side = Math.min(bk.side, S.length - 1);
+    const spreads = $('bkContent').value === 'spreads';
+    $('bkBlankEnds').nextElementSibling.textContent = spreads
+      ? 'Ultima pagina bianca (la 1 e\' sempre bianca con le doppie pagine)'
+      : 'Pagina 1 e ultima bianche (da incollare alla copertina)';
+    $('bkContentHint').textContent = spreads
+      ? 'Ogni doppia pagina diventa un\'apertura del libro, con la piega al centro della foto.'
+      : 'Ogni immagine o pagina PDF e\' una pagina del libro, nell\'ordine dell\'elenco.';
+    const blanks = bk.pages.filter(x => !x).length;
+    $('bkResults').innerHTML = bk.sources.length ? `
+      <div class="stat"><div class="val">${N}</div><div class="lbl">pagine</div></div>
+      <div class="stat"><div class="val">${N / 4}</div><div class="lbl">fogli</div></div>
+      <div class="stat"><div class="val">${N / 2}</div><div class="lbl">facciate</div></div>
+      <div class="stat ${blanks > 2 ? 'warn' : ''}"><div class="val">${blanks}</div><div class="lbl">bianche</div></div>
+      <div class="stat full"><div class="val" style="font-size:.85rem">pagina ${g.TW} x ${g.TH} mm · prolunga ${g.G} mm · abb. ${g.B} mm</div>
+        <div class="lbl">larghezza usata ${g.usedW.toFixed(1)} su ${g.availW.toFixed(1)} mm stampabili</div></div>`
+      : '<div class="stat full"><div class="val" style="font-size:.85rem">Carica le pagine</div></div>';
+    let badges = $('bkBinding').value === 'saddle'
+      ? '<span class="badge badge-green">Punto metallico</span>' : '<span class="badge badge-green">Brossura</span>';
+    badges += g.fits ? '<span class="badge badge-green">Entra nel foglio</span>'
+      : '<span class="badge badge-red">Non entra: riduci la pagina o la prolunga</span>';
+    if ($('bkBinding').value === 'saddle' && N > 48) badges += '<span class="badge badge-yellow">Molte pagine per il punto metallico</span>';
+    $('bkBadges').innerHTML = badges;
+    $('bkGenerate').disabled = !bk.sources.length || !g.fits;
+    drawPreview(g, S);
+    instructions(g, N);
+  }
+
+  function drawPreview(g, S) {
+    const cv = $('bkPreview'), ctx = cv.getContext('2d');
+    const sim = $('bkSim').checked;
+    const N = bk.pages.length;
+    const pad = 10;
+    const W = sim ? 2 * g.TW + 40 : g.SW, H = sim ? g.TH + 30 : g.SH;
+    const sc = Math.min((640 - 2 * pad) / W, (460 - 2 * pad) / H);
+    cv.width = Math.round(W * sc + 2 * pad); cv.height = Math.round(H * sc + 2 * pad);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.save();
+    ctx.translate(pad, pad); ctx.scale(sc, sc);
+    if (sim) {
+      const nOpen = N / 2 + 1;                       // aperture: (0,1) ... (N, N+1)
+      bk.opening = Math.max(0, Math.min(bk.opening, nOpen - 1));
+      const Lp = bk.opening * 2, Rp = Lp + 1;
+      $('bkSideLbl').textContent = `Apertura ${bk.opening + 1}/${nOpen}: pagine ${Lp || '-'} | ${Rp <= N ? Rp : '-'}`;
+      const ox = 20, oy = 15;                        // libro: piega in ox + TW
+      ctx.fillStyle = '#d9d9d9'; ctx.fillRect(0, 0, W, H);
+      [[Lp, 0], [Rp, 1]].forEach(([p, side]) => {
+        if (p < 1 || p > N) return;
+        const s = slot(g, p, side);
+        const [vx, vy, vw, vh] = s.visible;
+        const dx = ox + side * g.TW - vx, dy = oy - vy;   // porta la parte visibile della pagina nel libro
+        ctx.save();
+        ctx.translate(dx, dy);
+        ctx.beginPath(); ctx.rect(vx, vy, vw, vh); ctx.clip();
+        ctx.fillStyle = '#fff'; ctx.fillRect(vx, vy, vw, vh);
+        s.items.forEach(it => ctx.drawImage(it.src.thumb, it.cx - it.vw / 2, it.cy - it.vh / 2, it.vw, it.vh));
+        if (!bk.pages[p - 1]) { ctx.fillStyle = '#999'; ctx.font = '6px sans-serif'; ctx.textAlign = 'center';
+          ctx.fillText('bianca', vx + vw / 2, vy + vh / 2); }
+        ctx.restore();
+      });
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 0.4;
+      ctx.beginPath(); ctx.moveTo(ox + g.TW, oy); ctx.lineTo(ox + g.TW, oy + g.TH); ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    const sd = S[bk.side];
+    $('bkSideLbl').textContent = sd ? `Foglio ${sd.sheet}/${N / 4} ${sd.face} · pagine ${sd.L} | ${sd.R}` : '-';
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, g.SW, g.SH);
+    ctx.strokeStyle = '#999'; ctx.lineWidth = 0.4; ctx.strokeRect(0, 0, g.SW, g.SH);
+    ctx.setLineDash([2, 2]); ctx.strokeStyle = '#ccc';
+    ctx.strokeRect(g.M, g.M, g.SW - 2 * g.M, g.SH - 2 * g.M); ctx.setLineDash([]);
+    if (!sd) { ctx.restore(); return; }
+    [[sd.L, 0], [sd.R, 1]].forEach(([p, side]) => {
+      const s = slot(g, p, side);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(...s.clip); ctx.clip();
+      s.items.forEach(it => ctx.drawImage(it.src.thumb, it.cx - it.vw / 2, it.cy - it.vh / 2, it.vw, it.vh));
+      if (g.G > 0) {                                 // prolunga evidenziata in anteprima
+        ctx.fillStyle = 'rgba(233,69,96,.18)';
+        ctx.fillRect(side === 0 ? g.FOLD - g.G : g.FOLD, g.Y0 - g.B, g.G, g.TH + 2 * g.B);
+      }
+      ctx.restore();
+      const [vx, vy, vw, vh] = s.visible;
+      ctx.strokeStyle = '#4ecca3'; ctx.lineWidth = 0.5; ctx.strokeRect(vx, vy, vw, vh);
+      ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(bk.pages[p - 1] ? String(p) : `${p} (bianca)`, vx + vw / 2, vy + vh + g.B + 9);
+    });
+    if (g.marks) canvasMarks(ctx, g);
+    ctx.restore();
+  }
+
+  function markLines(g) {                            // [x1, y1, x2, y2, tipo] in mm
+    const { TW, TH, B, G, FOLD, Y0, SW } = g;
+    const gap = MARK_GAP + B, L = MARK_LEN, out = [];
+    const xl = FOLD - G - TW, xr = FOLD + G + TW;
+    [xl, xr].forEach(x => { out.push([x, Y0 - gap, x, Y0 - gap - L, 'trim']); out.push([x, Y0 + TH + gap, x, Y0 + TH + gap + L, 'trim']); });
+    [Y0, Y0 + TH].forEach(y => {
+      out.push([xl - gap, y, Math.max(1, xl - gap - 4), y, 'trim']);
+      out.push([xr + gap, y, Math.min(SW - 1, xr + gap + 4), y, 'trim']);
+    });
+    out.push([FOLD, Y0 - gap, FOLD, Y0 - gap - L, 'fold']); out.push([FOLD, Y0 + TH + gap, FOLD, Y0 + TH + gap + L, 'fold']);
+    if (G > 0) [FOLD - G, FOLD + G].forEach(x => {
+      out.push([x, Y0 - gap, x, Y0 - gap - L * 0.6, 'gutter']); out.push([x, Y0 + TH + gap, x, Y0 + TH + gap + L * 0.6, 'gutter']);
+    });
+    return out;
+  }
+
+  function canvasMarks(ctx, g) {
+    markLines(g).forEach(([x1, y1, x2, y2, t]) => {
+      ctx.strokeStyle = t === 'gutter' ? '#888' : '#000'; ctx.lineWidth = 0.3;
+      ctx.setLineDash(t === 'fold' ? [2, 2] : t === 'gutter' ? [0.6, 1.2] : []);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+  }
+
+  function instructions(g, N) {
+    const saddle = $('bkBinding').value === 'saddle';
+    const sheet = $('bkSheet').value;
+    $('bkInstructions').innerHTML = `<h2>Stampa e legatura</h2><ol>
+      <li>Stampa su <strong>${sheet}</strong> fronte-retro con <strong>capovolgimento sul lato corto</strong>, scala <strong>100%</strong> (non "adatta").</li>
+      ${saddle
+        ? `<li>Impila i ${N / 4} fogli in ordine (il foglio 1 sotto), piegali <strong>tutti insieme</strong> a meta' e metti i punti metallici sulla piega.</li>`
+        : `<li>Piega <strong>ogni foglio da solo</strong> sul tratteggio centrale e impila i ${N / 4} fogli in ordine, dal foglio 1 al ${N / 4}, senza infilarli uno nell'altro.</li>
+           <li>Incolla il dorso (lato delle pieghe). ${g.G > 0 ? `La prolunga di <strong>${g.G} mm</strong> per pagina va nel dorso: il tratteggio grigio fine segna dove inizia la pagina visibile.` : ''}</li>`}
+      <li>Rifila sopra, sotto e sul lato esterno seguendo i segni di taglio: pagina finita <strong>${g.TW} x ${g.TH} mm</strong>.</li>
+      </ol>
+      <div class="info-box info-yellow">Prima di stampare tutto fai una prova con 2-3 fogli: controlla il registro fronte/retro e
+      quanti millimetri spariscono davvero nel dorso, poi regola la prolunga.</div>`;
+  }
+
+  // ---------- PDF ----------
+  async function embedSource(out, src, cache, g) {
+    if (cache.has(src)) return cache.get(src);
+    let obj;
+    if (src.kind === 'pdf') {
+      if (!src.holder.lib) src.holder.lib = await PDFLib.PDFDocument.load(src.holder.bytes.slice(0));
+      const [emb] = await out.embedPdf(src.holder.lib, [src.index]);
+      obj = { emb, isImage: false, w: emb.width, h: emb.height };
+    } else {
+      // risoluzione di stampa: al massimo DPI sulla misura piu' grande a cui viene usata
+      const spreads = $('bkContent').value === 'spreads';
+      const mmW = (spreads ? 2 * g.TW : g.TW) + 2 * g.B;
+      const maxPx = Math.ceil(mmW / 25.4 * DPI * 1.05);
+      const buf = await src.file.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      const isJpg = bytes[0] === 0xFF && bytes[1] === 0xD8, isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+      let emb;
+      if (src.vw <= maxPx && (isJpg || isPng)) {
+        emb = isJpg ? await out.embedJpg(bytes) : await out.embedPng(bytes);
+      } else {
+        const img = await decode(buf, src.file.type);
+        const k = Math.min(1, maxPx / img.naturalWidth);
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+        const c2 = cv.getContext('2d');
+        c2.imageSmoothingQuality = 'high';
+        c2.drawImage(img, 0, 0, cv.width, cv.height);
+        const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.93));
+        emb = await out.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+        cv.width = cv.height = 0;
+        URL.revokeObjectURL(img.src);
+      }
+      obj = { emb, isImage: true, w: emb.width, h: emb.height };
+    }
+    cache.set(src, obj);
+    return obj;
+  }
+
+  async function generate() {
+    const g = geo();
+    if (!bk.sources.length || !g.fits) return;
+    const N = bk.pages.length, S = sides(N);
+    showLoading('Genero il PDF...');
+    try {
+      const out = await PDFLib.PDFDocument.create();
+      out.setTitle(`${bk.baseName} - libro ${$('bkSheet').value}`);
+      const font = await out.embedFont(PDFLib.StandardFonts.Helvetica);
+      const cache = new Map();
+      const pt = v => v * MM_TO_PT;
+      const Y = (y, h) => pt(g.SH - y - (h || 0));    // mm dall'alto -> pt dal basso
+      for (let i = 0; i < S.length; i++) {
+        const sd = S[i];
+        $('loadingText').textContent = `Foglio ${sd.sheet}/${N / 4} ${sd.face}...`;
+        const page = out.addPage([pt(g.SW), pt(g.SH)]);
+        for (const [p, side] of [[sd.L, 0], [sd.R, 1]]) {
+          const s = slot(g, p, side);
+          const [x, y, w, h] = s.clip;
+          pdfClip(page, pt(x), Y(y, h), pt(w), pt(h));
+          for (const it of s.items) {
+            const o = await embedSource(out, it.src, cache, g);
+            const r = it.src.rot || 0;                // /Rotate della pagina PDF (pdf-lib non lo applica)
+            const swap = r % 180 !== 0;
+            pdfDrawCentered(page, o.emb, o.isImage, pt(it.cx), Y(it.cy),
+                            pt(swap ? it.vh : it.vw), pt(swap ? it.vw : it.vh), r);
+          }
+          pdfUnclip(page);
+        }
+        if (g.marks) {
+          markLines(g).forEach(([x1, y1, x2, y2, t]) => page.drawLine({
+            start: { x: pt(x1), y: Y(y1) }, end: { x: pt(x2), y: Y(y2) }, thickness: 0.25,
+            color: t === 'gutter' ? PDFLib.rgb(0.55, 0.55, 0.55) : PDFLib.rgb(0, 0, 0),
+            dashArray: t === 'fold' ? [2 * MM_TO_PT, 2 * MM_TO_PT] : t === 'gutter' ? [0.6 * MM_TO_PT, 1.2 * MM_TO_PT] : undefined,
+          }));
+        }
+        const label = `${bk.baseName}  -  Foglio ${sd.sheet}/${N / 4} ${sd.face}  -  pagine ${sd.L} | ${sd.R}  -  `
+          + `pagina ${g.TW}x${g.TH} mm, prolunga ${g.G} mm`;
+        page.drawText(label.replace(/[^\x20-\x7E]/g, ''), {
+          x: pt(g.FOLD - g.G - g.TW), y: pt(g.M + 1), size: 6.5, font, color: PDFLib.rgb(0.45, 0.45, 0.45),
+        });
+      }
+      $('loadingText').textContent = 'Salvo il PDF...';
+      const bytes = await out.save();
+      await savePdf(bytes, `${bk.baseName} - ${$('bkBinding').value === 'saddle' ? 'punto metallico' : 'brossura'} ${$('bkSheet').value}.pdf`);
+    } catch (e) {
+      console.error(e);
+      showMessage('Errore nella generazione del PDF: ' + e.message);
+    }
+    hideLoading();
+  }
+
+  // ---------- eventi ----------
+  ['bkContent', 'bkBlankEnds', 'bkBinding', 'bkFill', 'bkMarks', 'bkSim'].forEach(id => $(id).addEventListener('change', () => {
+    if (id === 'bkBinding') $('bkGutter').value = $('bkBinding').value === 'saddle' ? 0 : 5;
+    if (['bkContent', 'bkMarks', 'bkBinding'].includes(id) && !bk.userSize && bk.sources.length) setMaxSize();
+    refresh();
+  }));
+  ['bkSheet', 'bkBleed', 'bkGutter', 'bkMargin'].forEach(id => $(id).addEventListener('input', () => {
+    if (!bk.userSize && bk.sources.length) setMaxSize();
+    refresh();
+  }));
+  ['bkPageW', 'bkPageH'].forEach(id => $(id).addEventListener('input', () => { bk.userSize = true; refresh(); }));
+  $('bkSheet').addEventListener('change', () => { if (!bk.userSize && bk.sources.length) setMaxSize(); refresh(); });
+  $('bkMax').addEventListener('click', () => { bk.userSize = false; setMaxSize(); refresh(); });
+  $('bkPrev').addEventListener('click', () => { if ($('bkSim').checked) bk.opening--; else bk.side = Math.max(0, bk.side - 1); refresh(); });
+  $('bkNext').addEventListener('click', () => { if ($('bkSim').checked) bk.opening++; else bk.side++; refresh(); });
+  $('bkGenerate').addEventListener('click', generate);
+  window.addEventListener('keydown', e => {
+    if ($('modeBook').style.display === 'none' || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
+    if (e.key === 'ArrowLeft') $('bkPrev').click();
+    if (e.key === 'ArrowRight') $('bkNext').click();
+  });
+  refresh();
+})();
+</script>
+</body>
+</html>
